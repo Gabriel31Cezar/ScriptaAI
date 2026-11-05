@@ -296,6 +296,46 @@ select.field {
     margin-top: 8px;
 }
 
+/* Barra de ferramentas */
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 16px;
+}
+
+.tool-btn {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.tool-btn:hover {
+    border-color: var(--accent);
+}
+
+.tool-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.tool-btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: bold;
+}
+
+.tool-btn-primary:hover {
+    border-color: var(--accent);
+    opacity: 0.9;
+}
+
 @media (max-width: 768px) {
     .layout {
         grid-template-columns: 1fr;
