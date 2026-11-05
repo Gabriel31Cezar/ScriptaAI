@@ -132,7 +132,20 @@
 
             <section class="sidebar-section">
                 <h3>Imagens e fórmulas</h3>
-                <p class="placeholder">Tamanho e disposição de imagens serão adicionados em etapa futura.</p>
+
+                <label class="field-label" for="image-size-select">Tamanho das imagens</label>
+                <select id="image-size-select" class="field">
+                    <option value="30">Pequeno (30%)</option>
+                    <option value="60" selected>Médio (60%)</option>
+                    <option value="100">Largura total (100%)</option>
+                </select>
+
+                <label class="field-label" for="image-layout-select">Disposição</label>
+                <select id="image-layout-select" class="field">
+                    <option value="below" selected>Abaixo do texto</option>
+                    <option value="side">Texto ao lado (2 colunas)</option>
+                    <option value="center">Centralizado</option>
+                </select>
             </section>
         </aside>
 
