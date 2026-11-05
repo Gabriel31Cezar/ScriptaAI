@@ -127,6 +127,119 @@ body {
     color: var(--accent);
 }
 
+/* Campos */
+.field-label {
+    display: block;
+    margin: 10px 0 4px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--text);
+}
+
+.field {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+}
+
+.field:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Área de upload */
+.upload-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 18px 12px;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    text-align: center;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.upload-zone:hover {
+    border-color: var(--accent);
+}
+
+.upload-zone small {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+/* Cards de norma */
+.norm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.norm-card {
+    position: relative;
+    cursor: pointer;
+}
+
+/* Botão de rádio oculto visualmente; continua acessível pelo teclado */
+.norm-card input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    pointer-events: none;
+}
+
+.norm-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+}
+
+.norm-title {
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.norm-desc {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+.norm-card:hover .norm-body {
+    border-color: var(--accent);
+}
+
+.norm-card:focus-within .norm-body {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.norm-card input:checked + .norm-body {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.norm-card input:checked + .norm-body .norm-title,
+.norm-card input:checked + .norm-body .norm-desc {
+    color: var(--accent-text);
+}
+
 @media (max-width: 768px) {
     .layout {
         grid-template-columns: 1fr;

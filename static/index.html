@@ -15,14 +15,65 @@
     <div class="layout">
         <aside class="sidebar" id="sidebar">
             <h2>Configurações</h2>
+
             <section class="sidebar-section">
                 <h3>Entradas de conteúdo</h3>
-                <p class="placeholder">Prompt, links e upload de arquivos serão adicionados em etapa futura.</p>
+
+                <label class="field-label" for="prompt-input">Prompt</label>
+                <textarea id="prompt-input" class="field" rows="4"
+                          placeholder="Descreva o documento que você deseja gerar..."></textarea>
+
+                <label class="field-label" for="links-input">Links (artigos, Wikipédia, YouTube)</label>
+                <textarea id="links-input" class="field" rows="3"
+                          placeholder="Cole um link por linha"></textarea>
+
+                <span class="field-label">Arquivos fonte</span>
+                <label class="upload-zone" for="file-input">
+                    <span>Clique para selecionar arquivos</span>
+                    <small>.txt, .md, .docx, .mp3, .mp4</small>
+                    <input type="file" id="file-input" multiple
+                           accept=".txt,.md,.docx,.mp3,.mp4" hidden>
+                </label>
             </section>
+
             <section class="sidebar-section">
                 <h3>Formatação</h3>
-                <p class="placeholder">Seleção de normas será adicionada em etapa futura.</p>
+
+                <div class="norm-grid" role="radiogroup" aria-label="Norma de formatação">
+                    <label class="norm-card">
+                        <input type="radio" name="norm" value="abnt" checked>
+                        <span class="norm-body">
+                            <span class="norm-title">ABNT</span>
+                            <span class="norm-desc">Trabalhos acadêmicos brasileiros</span>
+                        </span>
+                    </label>
+
+                    <label class="norm-card">
+                        <input type="radio" name="norm" value="apa-ieee">
+                        <span class="norm-body">
+                            <span class="norm-title">APA / IEEE</span>
+                            <span class="norm-desc">Textos técnicos e científicos</span>
+                        </span>
+                    </label>
+
+                    <label class="norm-card">
+                        <input type="radio" name="norm" value="executivo">
+                        <span class="norm-body">
+                            <span class="norm-title">Executivo Moderno</span>
+                            <span class="norm-desc">Relatórios e documentos corporativos</span>
+                        </span>
+                    </label>
+
+                    <label class="norm-card">
+                        <input type="radio" name="norm" value="apostila">
+                        <span class="norm-body">
+                            <span class="norm-title">Apostila Compacta</span>
+                            <span class="norm-desc">Material didático enxuto</span>
+                        </span>
+                    </label>
+                </div>
             </section>
+
             <section class="sidebar-section">
                 <h3>Tipografia e capa</h3>
                 <p class="placeholder">Ajustes de fonte, tamanho, margem e capa serão adicionados em etapa futura.</p>
