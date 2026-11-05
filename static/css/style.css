@@ -240,6 +240,17 @@ body {
     color: var(--accent-text);
 }
 
+/* Seletores de tipografia */
+.field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+select.field {
+    cursor: pointer;
+}
+
 @media (max-width: 768px) {
     .layout {
         grid-template-columns: 1fr;
