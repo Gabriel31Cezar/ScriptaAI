@@ -251,6 +251,51 @@ select.field {
     cursor: pointer;
 }
 
+/* Capa sanfonada */
+.cover-details {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    padding: 0 10px 10px;
+}
+
+.cover-details summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--text);
+    cursor: pointer;
+    list-style: none;
+}
+
+/* Remove a seta padrão do navegador (Safari/Chrome) */
+.cover-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.cover-details summary::after {
+    content: "+";
+    font-size: 1.1rem;
+    color: var(--accent);
+}
+
+.cover-details[open] summary::after {
+    content: "\2212";
+}
+
+.cover-details summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cover-details .field-label {
+    margin-top: 8px;
+}
+
 @media (max-width: 768px) {
     .layout {
         grid-template-columns: 1fr;
