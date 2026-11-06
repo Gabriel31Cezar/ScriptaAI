@@ -10,6 +10,9 @@ const imageLayoutSelect = document.getElementById('image-layout-select');
 const mediaBox = document.getElementById('a4-media');
 const privacyLink = document.getElementById('privacy-link');
 const privacyModal = document.getElementById('privacy-modal');
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const fileList = document.getElementById('file-list');
 
 const FONT_FAMILIES = {
     arial: 'Arial, Helvetica, sans-serif',
@@ -17,6 +20,8 @@ const FONT_FAMILIES = {
     roboto: 'Roboto, Arial, sans-serif',
     monospace: '"Courier New", Courier, monospace'
 };
+
+const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.docx', '.mp3', '.mp4'];
 
 const coverBox = document.getElementById('a4-cover');
 const coverFields = [
@@ -92,6 +97,54 @@ function closeOnBackdropClick(event) {
     }
 }
 
+function formatSize(bytes) {
+    if (bytes < 1024) {
+        return bytes + ' B';
+    }
+    if (bytes < 1024 * 1024) {
+        return (bytes / 1024).toFixed(1) + ' KB';
+    }
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function isAcceptedFile(name) {
+    const lower = name.toLowerCase();
+    return ACCEPTED_EXTENSIONS.some(ext => lower.endsWith(ext));
+}
+
+function renderFileList(files) {
+    fileList.textContent = '';
+
+    if (files.length === 0) {
+        fileList.hidden = true;
+        return;
+    }
+
+    files.forEach(file => {
+        const accepted = isAcceptedFile(file.name);
+
+        const item = document.createElement('li');
+        item.className = 'file-item' + (accepted ? '' : ' is-invalid');
+
+        const name = document.createElement('span');
+        name.className = 'file-name';
+        name.textContent = file.name;
+
+        const meta = document.createElement('span');
+        meta.className = 'file-size';
+        meta.textContent = accepted ? formatSize(file.size) : 'formato não aceito';
+
+        item.append(name, meta);
+        fileList.appendChild(item);
+    });
+
+    fileList.hidden = false;
+}
+
+function setDragHighlight(active) {
+    uploadZone.classList.toggle('is-dragover', active);
+}
+
 applyTheme(getInitialTheme());
 toggleButton.addEventListener('click', toggleTheme);
 
@@ -118,3 +171,32 @@ imageLayoutSelect.addEventListener('change', () => applyImageLayout(imageLayoutS
 
 privacyLink.addEventListener('click', openPrivacyModal);
 privacyModal.addEventListener('click', closeOnBackdropClick);
+
+// Upload: seleção pelo clique
+fileInput.addEventListener('change', () => {
+    renderFileList(Array.from(fileInput.files));
+});
+
+// Upload: arrastar e soltar
+['dragenter', 'dragover'].forEach(type => {
+    uploadZone.addEventListener(type, event => {
+        event.preventDefault();
+        setDragHighlight(true);
+    });
+});
+
+['dragleave', 'drop'].forEach(type => {
+    uploadZone.addEventListener(type, event => {
+        event.preventDefault();
+        setDragHighlight(false);
+    });
+});
+
+uploadZone.addEventListener('drop', event => {
+    renderFileList(Array.from(event.dataTransfer.files));
+});
+
+// Impede que o navegador abra um arquivo solto fora da área de upload
+['dragover', 'drop'].forEach(type => {
+    window.addEventListener(type, event => event.preventDefault());
+});

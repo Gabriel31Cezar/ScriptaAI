@@ -153,6 +153,7 @@ body {
     text-align: center;
     font-size: 0.9rem;
     cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .upload-zone:hover {
@@ -162,6 +163,53 @@ body {
 .upload-zone small {
     color: var(--muted);
     font-size: 0.8rem;
+}
+
+/* Upload: destaque e lista de arquivos */
+.upload-zone.is-dragover {
+    border-color: var(--accent);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
+}
+
+.file-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    font-size: 0.8rem;
+}
+
+.file-name {
+    overflow-wrap: anywhere;
+    color: var(--text);
+}
+
+.file-size {
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.file-item.is-invalid {
+    border-color: #dc2626;
+}
+
+.file-item.is-invalid .file-size {
+    color: #dc2626;
+    font-weight: bold;
 }
 
 /* Cards de norma */
