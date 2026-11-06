@@ -9,12 +9,15 @@ const sheet = document.getElementById('a4-sheet');
 const imageSizeSelect = document.getElementById('image-size-select');
 const imageLayoutSelect = document.getElementById('image-layout-select');
 const mediaBox = document.getElementById('a4-media');
+const formulaInput = document.getElementById('formula-input');
+const formulaBox = document.getElementById('a4-formula');
 const privacyLink = document.getElementById('privacy-link');
 const privacyModal = document.getElementById('privacy-modal');
 const uploadZone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');
 const fileList = document.getElementById('file-list');
 const generateBtn = document.getElementById('generate-btn');
+const pdfBtn = document.getElementById('pdf-btn');
 const copyBtn = document.getElementById('copy-btn');
 const newDocBtn = document.getElementById('new-doc-btn');
 const promptInput = document.getElementById('prompt-input');
@@ -70,12 +73,20 @@ function applySize(value) {
     sheet.style.fontSize = value + 'pt';
 }
 
+// Tamanho escolhido vale para imagem e fórmula
 function applyImageSize(value) {
     mediaBox.setAttribute('data-size', value);
+    formulaBox.setAttribute('data-size', value);
 }
 
 function applyImageLayout(value) {
     mediaBox.setAttribute('data-layout', value);
+}
+
+function updateFormula() {
+    const value = formulaInput.value.trim();
+    formulaBox.textContent = value;
+    formulaBox.hidden = value === '';
 }
 
 function updateCover() {
@@ -160,6 +171,7 @@ function refreshSheet() {
     applyImageSize(imageSizeSelect.value);
     applyImageLayout(imageLayoutSelect.value);
     updateCover();
+    updateFormula();
 }
 
 function formatTime(date) {
@@ -181,7 +193,7 @@ function generatePreview() {
     }, PREVIEW_DELAY_MS);
 }
 
-// Novo Documento: limpa campos de texto, arquivos e capa. Mantém as escolhas de formatação.
+// Novo Documento: limpa campos de texto, arquivos, capa e fórmula. Mantém as escolhas de formatação.
 function clearDocument() {
     promptInput.value = '';
     linksInput.value = '';
@@ -191,42 +203,16 @@ function clearDocument() {
     });
     updateCover();
 
+    formulaInput.value = '';
+    updateFormula();
+
     fileInput.value = '';
     renderFileList([]);
 
     previewStatus.textContent = 'Novo documento iniciado.';
 }
 
-// Copiar Texto: tenta a API moderna e, se o navegador bloquear, usa o método alternativo
-async function copyToClipboard(text) {
-    try {
-        if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(text);
-            return true;
-        }
-    } catch (error) {
-        // Cai para o método alternativo abaixo
-    }
-
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', '');
-    area.style.position = 'fixed';
-    area.style.opacity = '0';
-    document.body.appendChild(area);
-    area.select();
-
-    let copied = false;
-    try {
-        copied = document.execCommand('copy');
-    } catch (error) {
-        copied = false;
-    }
-
-    area.remove();
-    return copied;
-}
-
+// Copiar Texto: usa a API moderna da área de transferência (funciona em localhost e HTTPS)
 async function copyText() {
     const text = sheet.innerText.trim();
 
@@ -235,10 +221,18 @@ async function copyText() {
         return;
     }
 
-    const ok = await copyToClipboard(text);
-    previewStatus.textContent = ok
-        ? 'Texto copiado para a área de transferência.'
-        : 'Não foi possível copiar o texto.';
+    try {
+        await navigator.clipboard.writeText(text);
+        previewStatus.textContent = 'Texto copiado para a área de transferência.';
+    } catch (error) {
+        previewStatus.textContent = 'Não foi possível copiar o texto.';
+    }
+}
+
+// Baixar PDF: abre a caixa de impressão do navegador, que mostra só a folha A4
+function printSheet() {
+    previewStatus.textContent = 'Abrindo caixa de impressão...';
+    window.print();
 }
 
 applyTheme(getInitialTheme());
@@ -264,6 +258,9 @@ imageSizeSelect.addEventListener('change', () => applyImageSize(imageSizeSelect.
 
 applyImageLayout(imageLayoutSelect.value);
 imageLayoutSelect.addEventListener('change', () => applyImageLayout(imageLayoutSelect.value));
+
+formulaInput.addEventListener('input', updateFormula);
+updateFormula();
 
 privacyLink.addEventListener('click', openPrivacyModal);
 privacyModal.addEventListener('click', closeOnBackdropClick);
@@ -300,6 +297,12 @@ uploadZone.addEventListener('drop', event => {
 // Botão Gerar/Atualizar Preview
 generateBtn.addEventListener('click', generatePreview);
 
-// Botões Copiar Texto e Novo Documento
+// Botões Baixar PDF, Copiar Texto e Novo Documento
+pdfBtn.addEventListener('click', printSheet);
 copyBtn.addEventListener('click', copyText);
 newDocBtn.addEventListener('click', clearDocument);
+
+// Quando a caixa de impressão fecha (salvou ou cancelou), atualiza o status
+window.addEventListener('afterprint', () => {
+    previewStatus.textContent = 'Caixa de impressão fechada.';
+});

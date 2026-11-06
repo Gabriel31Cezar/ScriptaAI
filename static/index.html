@@ -134,7 +134,7 @@
             <section class="sidebar-section">
                 <h3>Imagens e fórmulas</h3>
 
-                <label class="field-label" for="image-size-select">Tamanho das imagens</label>
+                <label class="field-label" for="image-size-select">Tamanho das imagens e fórmulas</label>
                 <select id="image-size-select" class="field">
                     <option value="30">Pequeno (30%)</option>
                     <option value="60" selected>Médio (60%)</option>
@@ -147,6 +147,9 @@
                     <option value="side">Texto ao lado (2 colunas)</option>
                     <option value="center">Centralizado</option>
                 </select>
+
+                <label class="field-label" for="formula-input">Fórmula (texto)</label>
+                <input type="text" id="formula-input" class="field" placeholder="Ex.: E = mc2">
             </section>
         </aside>
 
@@ -155,7 +158,7 @@
 
             <div class="toolbar" role="toolbar" aria-label="Ações do documento">
                 <button type="button" id="generate-btn" class="tool-btn tool-btn-primary">Gerar/Atualizar Preview</button>
-                <button type="button" class="tool-btn">Baixar PDF</button>
+                <button type="button" id="pdf-btn" class="tool-btn">Baixar PDF</button>
                 <button type="button" class="tool-btn">Baixar DOCX</button>
                 <button type="button" id="copy-btn" class="tool-btn">Copiar Texto</button>
                 <button type="button" id="new-doc-btn" class="tool-btn">Novo Documento</button>
@@ -194,6 +197,8 @@
                             </figure>
                             <p class="a4-side-text">Texto de apoio que acompanha a imagem. Quando a disposição for "Texto ao lado", ele aparece à direita da figura.</p>
                         </div>
+
+                        <div class="a4-formula" id="a4-formula" data-size="60" hidden></div>
 
                         <p>O conteúdo real do documento será gerado pela IA em uma etapa futura. Por enquanto, o objetivo é conferir o formato da página e o espaçamento das margens.</p>
                         <p>Parágrafos adicionais aparecem aqui para mostrar como o texto ocupa a área útil da folha, respeitando a margem escolhida.</p>
