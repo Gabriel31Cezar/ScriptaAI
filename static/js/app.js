@@ -5,6 +5,9 @@ const marginSelect = document.getElementById('margin-select');
 const fontSelect = document.getElementById('font-select');
 const sizeSelect = document.getElementById('size-select');
 const sheet = document.getElementById('a4-sheet');
+const imageSizeSelect = document.getElementById('image-size-select');
+const imageLayoutSelect = document.getElementById('image-layout-select');
+const mediaBox = document.getElementById('a4-media');
 
 const FONT_FAMILIES = {
     arial: 'Arial, Helvetica, sans-serif',
@@ -52,6 +55,14 @@ function applySize(value) {
     sheet.style.fontSize = value + 'pt';
 }
 
+function applyImageSize(value) {
+    mediaBox.setAttribute('data-size', value);
+}
+
+function applyImageLayout(value) {
+    mediaBox.setAttribute('data-layout', value);
+}
+
 function updateCover() {
     let hasAnyText = false;
 
@@ -84,3 +95,9 @@ coverFields.forEach(({ input }) => {
 });
 
 updateCover();
+
+applyImageSize(imageSizeSelect.value);
+imageSizeSelect.addEventListener('change', () => applyImageSize(imageSizeSelect.value));
+
+applyImageLayout(imageLayoutSelect.value);
+imageLayoutSelect.addEventListener('change', () => applyImageLayout(imageLayoutSelect.value));
