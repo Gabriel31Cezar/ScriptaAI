@@ -13,6 +13,14 @@ const FONT_FAMILIES = {
     monospace: '"Courier New", Courier, monospace'
 };
 
+const coverBox = document.getElementById('a4-cover');
+const coverFields = [
+    { input: document.getElementById('cover-title'), output: document.getElementById('out-title') },
+    { input: document.getElementById('cover-subtitle'), output: document.getElementById('out-subtitle') },
+    { input: document.getElementById('cover-author'), output: document.getElementById('out-author') },
+    { input: document.getElementById('cover-institution'), output: document.getElementById('out-institution') }
+];
+
 function applyTheme(theme) {
     root.setAttribute('data-theme', theme);
     toggleButton.textContent = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
@@ -44,6 +52,21 @@ function applySize(value) {
     sheet.style.fontSize = value + 'pt';
 }
 
+function updateCover() {
+    let hasAnyText = false;
+
+    coverFields.forEach(({ input, output }) => {
+        const value = input.value.trim();
+        output.textContent = value;
+        output.hidden = value === '';
+        if (value !== '') {
+            hasAnyText = true;
+        }
+    });
+
+    coverBox.hidden = !hasAnyText;
+}
+
 applyTheme(getInitialTheme());
 toggleButton.addEventListener('click', toggleTheme);
 
@@ -55,3 +78,9 @@ fontSelect.addEventListener('change', () => applyFont(fontSelect.value));
 
 applySize(sizeSelect.value);
 sizeSelect.addEventListener('change', () => applySize(sizeSelect.value));
+
+coverFields.forEach(({ input }) => {
+    input.addEventListener('input', updateCover);
+});
+
+updateCover();

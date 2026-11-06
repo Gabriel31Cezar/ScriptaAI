@@ -1,3 +1,7 @@
+[hidden] {
+    display: none !important;
+}
+
 :root {
     --bg: #f4f6fa;
     --surface: #ffffff;
@@ -366,6 +370,34 @@ select.field {
 .a4-sheet p {
     margin: 0 0 10px;
     text-align: justify;
+}
+
+/* Capa na folha A4 */
+.a4-sheet .a4-cover {
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #d9dee6;
+}
+
+.a4-sheet .a4-cover-title {
+    margin: 0 0 8px;
+    font-size: 1.6em;
+    font-weight: bold;
+    color: #1f2933;
+}
+
+.a4-sheet .a4-cover-line {
+    margin: 4px 0;
+    text-align: center;
+    font-size: 0.95em;
+    color: #1f2933;
+}
+
+.a4-sheet .a4-cover-subtitle {
+    margin: 0 0 16px;
+    font-size: 1.1em;
+    color: #4b5563;
 }
 
 @media (max-width: 768px) {
