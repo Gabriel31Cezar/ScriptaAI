@@ -1,4 +1,5 @@
 const THEME_KEY = 'scripta-theme';
+const PREVIEW_DELAY_MS = 2000;
 const root = document.documentElement;
 const toggleButton = document.getElementById('theme-toggle');
 const marginSelect = document.getElementById('margin-select');
@@ -13,6 +14,9 @@ const privacyModal = document.getElementById('privacy-modal');
 const uploadZone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');
 const fileList = document.getElementById('file-list');
+const generateBtn = document.getElementById('generate-btn');
+const loadingBox = document.getElementById('a4-loading');
+const previewStatus = document.getElementById('preview-status');
 
 const FONT_FAMILIES = {
     arial: 'Arial, Helvetica, sans-serif',
@@ -145,6 +149,34 @@ function setDragHighlight(active) {
     uploadZone.classList.toggle('is-dragover', active);
 }
 
+function refreshSheet() {
+    applyMargin(marginSelect.value);
+    applyFont(fontSelect.value);
+    applySize(sizeSelect.value);
+    applyImageSize(imageSizeSelect.value);
+    applyImageLayout(imageLayoutSelect.value);
+    updateCover();
+}
+
+function formatTime(date) {
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function generatePreview() {
+    generateBtn.disabled = true;
+    sheet.setAttribute('aria-busy', 'true');
+    loadingBox.hidden = false;
+    previewStatus.textContent = 'Gerando preview...';
+
+    setTimeout(() => {
+        refreshSheet();
+        loadingBox.hidden = true;
+        sheet.removeAttribute('aria-busy');
+        generateBtn.disabled = false;
+        previewStatus.textContent = 'Preview atualizado às ' + formatTime(new Date()) + '.';
+    }, PREVIEW_DELAY_MS);
+}
+
 applyTheme(getInitialTheme());
 toggleButton.addEventListener('click', toggleTheme);
 
@@ -200,3 +232,6 @@ uploadZone.addEventListener('drop', event => {
 ['dragover', 'drop'].forEach(type => {
     window.addEventListener(type, event => event.preventDefault());
 });
+
+// Botão Gerar/Atualizar Preview
+generateBtn.addEventListener('click', generatePreview);

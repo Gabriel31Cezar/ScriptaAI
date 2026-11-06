@@ -154,15 +154,28 @@
             <h2>Pré-visualização</h2>
 
             <div class="toolbar" role="toolbar" aria-label="Ações do documento">
-                <button type="button" class="tool-btn tool-btn-primary">Gerar/Atualizar Preview</button>
+                <button type="button" id="generate-btn" class="tool-btn tool-btn-primary">Gerar/Atualizar Preview</button>
                 <button type="button" class="tool-btn">Baixar PDF</button>
                 <button type="button" class="tool-btn">Baixar DOCX</button>
                 <button type="button" class="tool-btn">Copiar Texto</button>
                 <button type="button" class="tool-btn">Novo Documento</button>
             </div>
 
+            <p class="preview-status" id="preview-status" aria-live="polite"></p>
+
             <div class="preview-area">
                 <div class="a4-sheet" id="a4-sheet" data-margin="normal">
+                    <div class="a4-loading" id="a4-loading" hidden>
+                        <div class="spinner" aria-hidden="true"></div>
+                        <div class="skeleton-block" aria-hidden="true">
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line short"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                        </div>
+                    </div>
+
                     <div class="a4-cover" id="a4-cover" hidden>
                         <h2 class="a4-cover-title" id="out-title" hidden></h2>
                         <p class="a4-cover-line a4-cover-subtitle" id="out-subtitle" hidden></p>
