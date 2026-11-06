@@ -1,6 +1,8 @@
 const THEME_KEY = 'scripta-theme';
 const root = document.documentElement;
 const toggleButton = document.getElementById('theme-toggle');
+const marginSelect = document.getElementById('margin-select');
+const sheet = document.getElementById('a4-sheet');
 
 function applyTheme(theme) {
     root.setAttribute('data-theme', theme);
@@ -21,5 +23,12 @@ function toggleTheme() {
     applyTheme(next);
 }
 
+function applyMargin(value) {
+    sheet.setAttribute('data-margin', value);
+}
+
 applyTheme(getInitialTheme());
 toggleButton.addEventListener('click', toggleTheme);
+
+applyMargin(marginSelect.value);
+marginSelect.addEventListener('change', () => applyMargin(marginSelect.value));
