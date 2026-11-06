@@ -475,6 +475,66 @@ select.field {
     text-align: center;
 }
 
+/* Modal de privacidade */
+.privacy-modal {
+    width: 90%;
+    max-width: 640px;
+    max-height: 80vh;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.privacy-modal::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.modal-inner {
+    padding: 24px;
+    overflow-y: auto;
+    max-height: 80vh;
+}
+
+.privacy-modal h2 {
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+    color: var(--accent);
+}
+
+.privacy-modal h3 {
+    margin: 16px 0 4px;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.privacy-modal p {
+    margin: 0 0 8px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.modal-note {
+    padding: 8px 10px;
+    border-left: 3px solid var(--accent);
+    background: var(--bg);
+    color: var(--muted) !important;
+    font-size: 0.85rem !important;
+}
+
+.modal-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.privacy-modal .tool-btn-primary {
+    cursor: pointer;
+}
+
 @media (max-width: 768px) {
     .layout {
         grid-template-columns: 1fr;

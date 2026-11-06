@@ -191,8 +191,34 @@
 
     <footer class="footer">
         <span>&copy; 2026 ScriptaAI. Todos os direitos reservados.</span>
-        <a href="#privacidade">Política de Privacidade &amp; Termos (LGPD)</a>
+        <a href="#privacidade" id="privacy-link">Política de Privacidade &amp; Termos (LGPD)</a>
     </footer>
+
+    <dialog id="privacy-modal" class="privacy-modal" aria-labelledby="privacy-title">
+        <div class="modal-inner">
+            <h2 id="privacy-title">Política de Privacidade &amp; Termos (LGPD)</h2>
+            <p class="modal-note">Texto preliminar. Deve ser revisado por profissional jurídico antes da publicação.</p>
+
+            <h3>1. Dados tratados</h3>
+            <p>O ScriptaAI pode receber o texto digitado no prompt, links colados, arquivos enviados para a geração de documentos e os dados de capa preenchidos (título, subtítulo, autor e instituição).</p>
+
+            <h3>2. Tratamento temporário</h3>
+            <p>Nesta versão, o conteúdo é usado apenas na sua sessão de navegação. Os dados não são gravados em banco de dados e não são compartilhados com terceiros. Ao fechar ou recarregar a página, as informações digitadas podem ser perdidas.</p>
+
+            <h3>3. Finalidade</h3>
+            <p>Os dados são usados somente para montar a pré-visualização e gerar o documento solicitado pelo usuário.</p>
+
+            <h3>4. Seus direitos</h3>
+            <p>Conforme a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), você pode solicitar informações sobre o tratamento dos seus dados e pedir a correção ou a exclusão deles, quando aplicável.</p>
+
+            <h3>5. Termos de uso</h3>
+            <p>O conteúdo gerado deve ser revisado pelo usuário antes de qualquer uso. A responsabilidade pela verificação de fontes, citações e direitos autorais é do usuário.</p>
+
+            <form method="dialog" class="modal-actions">
+                <button type="submit" class="tool-btn tool-btn-primary">Fechar</button>
+            </form>
+        </div>
+    </dialog>
 
     <script src="js/app.js" defer></script>
 </body>

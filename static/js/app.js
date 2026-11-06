@@ -8,6 +8,8 @@ const sheet = document.getElementById('a4-sheet');
 const imageSizeSelect = document.getElementById('image-size-select');
 const imageLayoutSelect = document.getElementById('image-layout-select');
 const mediaBox = document.getElementById('a4-media');
+const privacyLink = document.getElementById('privacy-link');
+const privacyModal = document.getElementById('privacy-modal');
 
 const FONT_FAMILIES = {
     arial: 'Arial, Helvetica, sans-serif',
@@ -78,6 +80,18 @@ function updateCover() {
     coverBox.hidden = !hasAnyText;
 }
 
+function openPrivacyModal(event) {
+    event.preventDefault();
+    privacyModal.showModal();
+}
+
+function closeOnBackdropClick(event) {
+    // Clique direto na própria caixa <dialog> (fora do conteúdo interno) fecha o modal
+    if (event.target === privacyModal) {
+        privacyModal.close();
+    }
+}
+
 applyTheme(getInitialTheme());
 toggleButton.addEventListener('click', toggleTheme);
 
@@ -101,3 +115,6 @@ imageSizeSelect.addEventListener('change', () => applyImageSize(imageSizeSelect.
 
 applyImageLayout(imageLayoutSelect.value);
 imageLayoutSelect.addEventListener('change', () => applyImageLayout(imageLayoutSelect.value));
+
+privacyLink.addEventListener('click', openPrivacyModal);
+privacyModal.addEventListener('click', closeOnBackdropClick);
