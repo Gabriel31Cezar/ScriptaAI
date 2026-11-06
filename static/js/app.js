@@ -15,6 +15,10 @@ const uploadZone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');
 const fileList = document.getElementById('file-list');
 const generateBtn = document.getElementById('generate-btn');
+const copyBtn = document.getElementById('copy-btn');
+const newDocBtn = document.getElementById('new-doc-btn');
+const promptInput = document.getElementById('prompt-input');
+const linksInput = document.getElementById('links-input');
 const loadingBox = document.getElementById('a4-loading');
 const previewStatus = document.getElementById('preview-status');
 
@@ -177,6 +181,66 @@ function generatePreview() {
     }, PREVIEW_DELAY_MS);
 }
 
+// Novo Documento: limpa campos de texto, arquivos e capa. Mantém as escolhas de formatação.
+function clearDocument() {
+    promptInput.value = '';
+    linksInput.value = '';
+
+    coverFields.forEach(({ input }) => {
+        input.value = '';
+    });
+    updateCover();
+
+    fileInput.value = '';
+    renderFileList([]);
+
+    previewStatus.textContent = 'Novo documento iniciado.';
+}
+
+// Copiar Texto: tenta a API moderna e, se o navegador bloquear, usa o método alternativo
+async function copyToClipboard(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch (error) {
+        // Cai para o método alternativo abaixo
+    }
+
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+
+    let copied = false;
+    try {
+        copied = document.execCommand('copy');
+    } catch (error) {
+        copied = false;
+    }
+
+    area.remove();
+    return copied;
+}
+
+async function copyText() {
+    const text = sheet.innerText.trim();
+
+    if (text === '') {
+        previewStatus.textContent = 'Não há texto para copiar.';
+        return;
+    }
+
+    const ok = await copyToClipboard(text);
+    previewStatus.textContent = ok
+        ? 'Texto copiado para a área de transferência.'
+        : 'Não foi possível copiar o texto.';
+}
+
 applyTheme(getInitialTheme());
 toggleButton.addEventListener('click', toggleTheme);
 
@@ -235,3 +299,7 @@ uploadZone.addEventListener('drop', event => {
 
 // Botão Gerar/Atualizar Preview
 generateBtn.addEventListener('click', generatePreview);
+
+// Botões Copiar Texto e Novo Documento
+copyBtn.addEventListener('click', copyText);
+newDocBtn.addEventListener('click', clearDocument);
