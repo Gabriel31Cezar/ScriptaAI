@@ -1,5 +1,6 @@
 const THEME_KEY = 'scripta-theme';
 const PREVIEW_DELAY_MS = 2000;
+const MARGIN_CM = { narrow: '1.5cm', normal: '2.5cm', wide: '3.5cm' };
 const root = document.documentElement;
 const toggleButton = document.getElementById('theme-toggle');
 const marginSelect = document.getElementById('margin-select');
@@ -18,6 +19,7 @@ const fileInput = document.getElementById('file-input');
 const fileList = document.getElementById('file-list');
 const generateBtn = document.getElementById('generate-btn');
 const pdfBtn = document.getElementById('pdf-btn');
+const docxBtn = document.getElementById('docx-btn');
 const copyBtn = document.getElementById('copy-btn');
 const newDocBtn = document.getElementById('new-doc-btn');
 const promptInput = document.getElementById('prompt-input');
@@ -224,7 +226,7 @@ async function copyText() {
     try {
         await navigator.clipboard.writeText(text);
         previewStatus.textContent = 'Texto copiado para a área de transferência.';
-    } catch (error) {
+    } catch {
         previewStatus.textContent = 'Não foi possível copiar o texto.';
     }
 }
@@ -233,6 +235,79 @@ async function copyText() {
 function printSheet() {
     previewStatus.textContent = 'Abrindo caixa de impressão...';
     window.print();
+}
+
+// Estilos aplicados dentro do arquivo .doc, para o Word reconhecer página e margens
+function buildWordCss(margin) {
+    return `
+        @page WordSection1 { size: 21cm 29.7cm; margin: ${margin}; }
+        div.WordSection1 { page: WordSection1; }
+        p { text-align: justify; margin: 0 0 10pt 0; }
+        .a4-cover { text-align: center; margin-bottom: 18pt; }
+        .a4-cover-title { font-size: 16pt; font-weight: bold; margin: 0 0 8pt 0; }
+        .a4-cover-line { text-align: center; margin: 4pt 0; }
+        .a4-title { font-size: 13pt; font-weight: bold; margin: 0 0 10pt 0; }
+        .a4-figure { text-align: center; }
+        .a4-image-placeholder { border: 1px dashed #9aa6b4; padding: 20pt; text-align: center; color: #6b7785; }
+        .a4-figure figcaption { text-align: center; font-size: 9pt; }
+        .a4-formula { text-align: center; font-style: italic; border: 1px dashed #9aa6b4; padding: 8pt; margin: 10pt 0; }
+    `;
+}
+
+// Monta o documento com a API DOM, sem HTML escrito como texto dentro do JavaScript
+function buildWordHtml() {
+    const margin = MARGIN_CM[marginSelect.value];
+    const font = sheet.style.fontFamily || 'Arial, Helvetica, sans-serif';
+    const size = sheet.style.fontSize || '12pt';
+
+    const doc = document.implementation.createHTMLDocument('Documento');
+    const html = doc.documentElement;
+    html.setAttribute('lang', 'pt-BR');
+    html.setAttribute('xmlns', 'http://www.w3.org/TR/REC-html40');
+    html.setAttribute('xmlns:o', 'urn:schemas-microsoft-com:office:office');
+    html.setAttribute('xmlns:w', 'urn:schemas-microsoft-com:office:word');
+
+    const meta = doc.createElement('meta');
+    meta.setAttribute('charset', 'utf-8');
+
+    const style = doc.createElement('style');
+    style.textContent = buildWordCss(margin);
+
+    doc.head.append(meta, style);
+
+    const wrapper = doc.createElement('div');
+    wrapper.className = 'WordSection1';
+    wrapper.setAttribute('style', `font-family: ${font}; font-size: ${size}; line-height: 1.5;`);
+
+    const content = sheet.cloneNode(true);
+    content.removeAttribute('id');
+    content.removeAttribute('style');
+    content.removeAttribute('data-margin');
+    content.removeAttribute('aria-busy');
+    content.querySelectorAll('[hidden], .a4-loading').forEach(el => el.remove());
+
+    wrapper.append(...Array.from(content.childNodes));
+    doc.body.appendChild(wrapper);
+
+    return '<!DOCTYPE html>\n' + html.outerHTML;
+}
+
+function downloadWord() {
+    const title = coverFields[0].input.value.trim();
+    const baseName = (title || 'documento').replace(/[\\/:*?"<>|]/g, '').slice(0, 80) || 'documento';
+
+    const blob = new Blob(['\ufeff' + buildWordHtml()], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = baseName + '.doc';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    previewStatus.textContent = 'Arquivo .doc gerado. Abra no Word ou no LibreOffice.';
 }
 
 applyTheme(getInitialTheme());
@@ -297,8 +372,9 @@ uploadZone.addEventListener('drop', event => {
 // Botão Gerar/Atualizar Preview
 generateBtn.addEventListener('click', generatePreview);
 
-// Botões Baixar PDF, Copiar Texto e Novo Documento
+// Botões Baixar PDF, Baixar DOCX, Copiar Texto e Novo Documento
 pdfBtn.addEventListener('click', printSheet);
+docxBtn.addEventListener('click', downloadWord);
 copyBtn.addEventListener('click', copyText);
 newDocBtn.addEventListener('click', clearDocument);
 
