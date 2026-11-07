@@ -34,7 +34,7 @@ const FONT_FAMILIES = {
     monospace: '"Courier New", Courier, monospace'
 };
 
-const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.docx', '.mp3', '.mp4'];
+const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.docx', '.mp3', '.mp4', '.png', '.pdf'];
 
 const coverBox = document.getElementById('a4-cover');
 const coverFields = [

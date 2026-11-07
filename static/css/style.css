@@ -692,43 +692,69 @@ select.field {
     }
 }
 
-/* Impressão e PDF: mostra somente a folha A4 */
+/* Impressão e PDF: a folha A4 flui por quantas páginas forem necessárias */
 @media print {
     @page {
         size: A4;
         margin: 0;
     }
 
+    html,
     body {
         display: block;
         min-height: auto;
+        margin: 0;
+        padding: 0;
         background: #ffffff;
     }
 
-    body * {
-        visibility: hidden;
+    /* Esconde tudo que não é a folha */
+    .topbar,
+    .sidebar,
+    .toolbar,
+    .preview-status,
+    .footer,
+    .main-panel h2,
+    .a4-loading,
+    .privacy-modal {
+        display: none !important;
     }
 
-    .a4-sheet,
-    .a4-sheet * {
-        visibility: visible;
+    .layout,
+    .main-panel,
+    .preview-area {
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: none;
     }
 
+    /* A folha volta ao fluxo normal, para que o texto continue na página seguinte */
     .a4-sheet {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 210mm;
+        position: static;
+        width: 100%;
         max-width: none;
-        min-height: 297mm;
+        min-height: 0;
         height: auto;
         aspect-ratio: auto;
         margin: 0;
         box-shadow: none;
         overflow: visible;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
     }
 
-    .a4-loading {
-        display: none !important;
+    /* Evita que figura e fórmula sejam partidas entre páginas */
+    .a4-figure,
+    .a4-formula,
+    .a4-cover {
+        break-inside: avoid;
+    }
+
+    .a4-sheet p {
+        orphans: 3;
+        widows: 3;
     }
 }
