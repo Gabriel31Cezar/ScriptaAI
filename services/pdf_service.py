@@ -1,10 +1,5 @@
 """
 Engine de compilação HTML/Markdown -> PDF via WeasyPrint.
-Regras estritas:
-  - Proibição de quebra de página antes de títulos (h1-h4).
-  - Proibição de quebra dentro de blocos de imagem/figura.
-  - Suporte a imagens em coluna (lado a lado) e abaixo do texto.
-  - Estilos por norma: ABNT, APA/IEEE, Executivo, Apostila.
 """
 
 from __future__ import annotations
@@ -14,10 +9,6 @@ from pathlib import Path
 
 import markdown
 from weasyprint import HTML
-
-# ---------------------------------------------------------------------------
-# Mapas de estilo por norma
-# ---------------------------------------------------------------------------
 
 _NORM_STYLES: dict[str, dict[str, str]] = {
     "abnt": {
@@ -32,7 +23,7 @@ _NORM_STYLES: dict[str, dict[str, str]] = {
         "font_family": "'Times New Roman', serif",
         "font_size": "12pt",
         "line_height": "2.0",
-        "margin": "2.54cm 2.54cm 2.54cm 2.54cm",
+        "margin": "2.54cm",
         "text_align": "left",
         "title_align": "left",
     },
@@ -40,7 +31,7 @@ _NORM_STYLES: dict[str, dict[str, str]] = {
         "font_family": "'Arial', sans-serif",
         "font_size": "11pt",
         "line_height": "1.4",
-        "margin": "2.5cm 2.5cm 2.5cm 2.5cm",
+        "margin": "2.5cm",
         "text_align": "justify",
         "title_align": "left",
     },
@@ -48,7 +39,7 @@ _NORM_STYLES: dict[str, dict[str, str]] = {
         "font_family": "'Arial', sans-serif",
         "font_size": "10pt",
         "line_height": "1.3",
-        "margin": "1.5cm 1.5cm 1.5cm 1.5cm",
+        "margin": "1.5cm",
         "text_align": "justify",
         "title_align": "left",
     },
@@ -61,10 +52,6 @@ _DENSITY_MARGIN: dict[str, str] = {
 }
 
 _IMAGE_SIZE_PCT: dict[int, str] = {30: "30%", 60: "60%", 100: "100%"}
-
-# ---------------------------------------------------------------------------
-# CSS base
-# ---------------------------------------------------------------------------
 
 _BASE_CSS = """
 @page {{
@@ -177,25 +164,18 @@ th {{
 }}
 """
 
-
-# ---------------------------------------------------------------------------
-# Funções auxiliares
-# ---------------------------------------------------------------------------
-
 def _normalize_norm(norm: str | None) -> str:
     key = (norm or "abnt").strip().lower()
     return key if key in _NORM_STYLES else "abnt"
-
 
 def _build_css(norm: str, margin_density: str | None, image_size: int | None) -> str:
     style = dict(_NORM_STYLES[norm])
     if margin_density and margin_density in _DENSITY_MARGIN:
         style["margin"] = _DENSITY_MARGIN[margin_density]
-    img_width = _IMAGE_SIZE_PCT.get(int(image_size or 100), "100%")
+    img_width = _IMAGE_SIZE_PCT.get(int(image_size or 60), "60%")
     style["img_width"] = img_width
     style["img_max_width"] = "100%"
     return _BASE_CSS.format(**style)
-
 
 def _cover_html(cover: dict | None) -> str:
     if not cover:
@@ -219,18 +199,16 @@ def _cover_html(cover: dict | None) -> str:
     parts.append("</div>")
     return "\n".join(parts)
 
-
 def _formula_html(formula: str | None) -> str:
     f = (formula or "").strip()
     if not f:
         return ""
     return f'<div class="formula-block">{_esc(f)}</div>'
 
-
 def _images_html(images: list[dict] | None, layout: str | None, size: int | None) -> str:
     if not images:
         return ""
-    width = _IMAGE_SIZE_PCT.get(int(size or 100), "100%")
+    width = _IMAGE_SIZE_PCT.get(int(size or 60), "60%")
     layout = (layout or "below").lower()
     figs = []
     for img in images:
@@ -247,10 +225,7 @@ def _images_html(images: list[dict] | None, layout: str | None, size: int | None
         return ""
     if layout == "side":
         return f'<div class="media-row">{"".join(figs)}</div>'
-    if layout == "center":
-        return "\n".join(figs)
     return "\n".join(figs)
-
 
 def _esc(text: str) -> str:
     return (
@@ -260,18 +235,13 @@ def _esc(text: str) -> str:
         .replace('"', "&quot;")
     )
 
-
 def _markdown_to_html(content: str) -> str:
+    # Adicionado nl2br para respeitar as quebras de linha do texto
     return markdown.markdown(
         content,
-        extensions=["extra", "tables", "fenced_code", "sane_lists"],
-        output_format="html5",
+        extensions=["extra", "tables", "fenced_code", "sane_lists", "nl2br"],
+        output_format="html",
     )
-
-
-# ---------------------------------------------------------------------------
-# API pública
-# ---------------------------------------------------------------------------
 
 def build_html(payload: dict) -> str:
     norm = _normalize_norm(payload.get("norm"))
@@ -280,6 +250,11 @@ def build_html(payload: dict) -> str:
     image_layout = payload.get("image_layout")
 
     content = (payload.get("content") or "").strip()
+
+    # Trava de segurança: se o usuário mandar gerar vazio, colocamos um aviso
+    if not content and not payload.get("cover") and not payload.get("images"):
+        content = "<p style='color: red;'>Nenhum conteúdo foi gerado. Por favor, digite um texto no prompt.</p>"
+
     content_html = _markdown_to_html(content) if content else ""
 
     cover = payload.get("cover") or {}
@@ -307,13 +282,11 @@ def build_html(payload: dict) -> str:
 </body>
 </html>"""
 
-
 def render_pdf(payload: dict, output_path: Path) -> Path:
     html_str = build_html(payload)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     HTML(string=html_str, base_url=str(output_path.parent)).write_pdf(str(output_path))
     return output_path
-
 
 def safe_filename(name: str) -> str:
     name = re.sub(r"[^\w.\-]+", "_", name, flags=re.UNICODE)

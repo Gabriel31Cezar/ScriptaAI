@@ -14,7 +14,7 @@
     </header>
 
     <div class="layout">
-        <aside class="sidebar" id="sidebar">
+        <aside class="sidebar">
             <h2>Configurações</h2>
 
             <section class="sidebar-section">
@@ -154,7 +154,7 @@
             </section>
         </aside>
 
-        <main class="main-panel" id="main-panel">
+        <main class="main-panel">
             <h2>Pré-visualização</h2>
 
             <div class="toolbar" role="toolbar" aria-label="Ações do documento">
@@ -180,14 +180,9 @@
                         </div>
                     </div>
 
-                    <div class="a4-cover" id="a4-cover" hidden>
-                        <h2 class="a4-cover-title" id="out-title" hidden></h2>
-                        <p class="a4-cover-line a4-cover-subtitle" id="out-subtitle" hidden></p>
-                        <p class="a4-cover-line" id="out-author" hidden></p>
-                        <p class="a4-cover-line" id="out-institution" hidden></p>
-                    </div>
+                    <div class="a4-cover" id="a4-cover" hidden></div>
 
-                    <div class="a4-content">
+                    <div class="a4-content" id="a4-content">
                         <h3 class="a4-title">Título de exemplo</h3>
                         <p>Este é um texto de exemplo para visualizar a folha A4. Ao trocar a densidade de margem na barra lateral, as bordas desta página mudam de tamanho.</p>
 
@@ -199,11 +194,11 @@
                             <p class="a4-side-text">Texto de apoio que acompanha a imagem. Quando a disposição for "Texto ao lado", ele aparece à direita da figura.</p>
                         </div>
 
-                        <div class="a4-formula" id="a4-formula" data-size="60" hidden></div>
-
                         <p>O conteúdo real do documento será gerado pela IA em uma etapa futura. Por enquanto, o objetivo é conferir o formato da página e o espaçamento das margens.</p>
                         <p>Parágrafos adicionais aparecem aqui para mostrar como o texto ocupa a área útil da folha, respeitando a margem escolhida.</p>
                     </div>
+
+                    <div class="a4-formula" id="a4-formula" data-size="60" hidden></div>
                 </div>
             </div>
         </main>

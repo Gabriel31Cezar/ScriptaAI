@@ -1,384 +1,671 @@
-const THEME_KEY = 'scripta-theme';
-const PREVIEW_DELAY_MS = 2000;
-const MARGIN_CM = { narrow: '1.5cm', normal: '2.5cm', wide: '3.5cm' };
-const root = document.documentElement;
-const toggleButton = document.getElementById('theme-toggle');
-const marginSelect = document.getElementById('margin-select');
-const fontSelect = document.getElementById('font-select');
-const sizeSelect = document.getElementById('size-select');
-const sheet = document.getElementById('a4-sheet');
-const imageSizeSelect = document.getElementById('image-size-select');
-const imageLayoutSelect = document.getElementById('image-layout-select');
-const mediaBox = document.getElementById('a4-media');
-const formulaInput = document.getElementById('formula-input');
-const formulaBox = document.getElementById('a4-formula');
-const privacyLink = document.getElementById('privacy-link');
-const privacyModal = document.getElementById('privacy-modal');
-const uploadZone = document.getElementById('upload-zone');
-const fileInput = document.getElementById('file-input');
-const fileList = document.getElementById('file-list');
-const generateBtn = document.getElementById('generate-btn');
-const pdfBtn = document.getElementById('pdf-btn');
-const docxBtn = document.getElementById('docx-btn');
-const copyBtn = document.getElementById('copy-btn');
-const newDocBtn = document.getElementById('new-doc-btn');
-const promptInput = document.getElementById('prompt-input');
-const linksInput = document.getElementById('links-input');
-const loadingBox = document.getElementById('a4-loading');
-const previewStatus = document.getElementById('preview-status');
+/* ==========================================================================
+   ScriptaAI — app.js
+   Etapa 1 (interface) + 3.1 (upload via API) + 3.2 (preview via API)
+   ========================================================================== */
 
-const FONT_FAMILIES = {
-    arial: 'Arial, Helvetica, sans-serif',
-    times: '"Times New Roman", Times, serif',
-    roboto: 'Roboto, Arial, sans-serif',
-    monospace: '"Courier New", Courier, monospace'
-};
+(() => {
+    "use strict";
 
-const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.docx', '.mp3', '.mp4', '.png', '.pdf'];
+    const ACCEPTED_EXTENSIONS = [".txt", ".md", ".docx", ".mp3", ".mp4", ".png", ".pdf"];
+    const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+    const API_UPLOAD = "/api/upload";
+    const API_PREVIEW = "/api/generate-preview";
+    const MAX_UPLOAD_MB = 25;
+    const THEME_KEY = "scripta-theme";
+    const MARGIN_CM = { narrow: "1.5cm", normal: "2.5cm", wide: "3.5cm" };
+    const FONT_FAMILIES = {
+        arial: "'Arial', sans-serif",
+        times: "'Times New Roman', serif",
+        roboto: "'Roboto', sans-serif",
+        monospace: "'Courier New', monospace"
+    };
+    // Elementos removidos do HTML que vem do servidor, por segurança
+    const UNSAFE_TAGS = ["script", "style", "iframe", "object", "embed", "link", "meta", "base", "form"];
 
-const coverBox = document.getElementById('a4-cover');
-const coverFields = [
-    { input: document.getElementById('cover-title'), output: document.getElementById('out-title') },
-    { input: document.getElementById('cover-subtitle'), output: document.getElementById('out-subtitle') },
-    { input: document.getElementById('cover-author'), output: document.getElementById('out-author') },
-    { input: document.getElementById('cover-institution'), output: document.getElementById('out-institution') }
-];
+    const state = {
+        theme: "light",
+        uploadedFiles: []
+    };
 
-function applyTheme(theme) {
-    root.setAttribute('data-theme', theme);
-    toggleButton.textContent = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
-}
+    /* ---------------------------------------------------------------------
+       Utilidades de acesso ao DOM
+       --------------------------------------------------------------------- */
+    const $ = (selector) => document.querySelector(selector);
 
-function getInitialTheme() {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved === 'light' || saved === 'dark') {
-        return saved;
+    const fieldValue = (selector) => {
+        const el = $(selector);
+        return el ? el.value : "";
+    };
+
+    const fieldTrim = (selector) => fieldValue(selector).trim();
+
+    function on(selector, eventName, handler) {
+        const el = $(selector);
+        if (el) el.addEventListener(eventName, handler);
     }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
 
-function toggleTheme() {
-    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    localStorage.setItem(THEME_KEY, next);
-    applyTheme(next);
-}
+    function setStatus(message, kind = "") {
+        const el = $("#preview-status");
+        if (!el) return;
+        el.textContent = message;
+        el.dataset.kind = kind;
+    }
 
-function applyMargin(value) {
-    sheet.setAttribute('data-margin', value);
-}
+    function formatBytes(bytes) {
+        if (!bytes && bytes !== 0) return "";
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
 
-function applyFont(value) {
-    sheet.style.fontFamily = FONT_FAMILIES[value];
-}
+    function extOf(name) {
+        const index = (name || "").lastIndexOf(".");
+        return index >= 0 ? name.slice(index).toLowerCase() : "";
+    }
 
-function applySize(value) {
-    sheet.style.fontSize = value + 'pt';
-}
+    /**
+     * Normaliza texto vindo de um textarea, apenas para o envio ao servidor:
+     * quebras de linha do Windows viram "\n", e as sequências literais "\n" e "\t"
+     * (barra invertida + letra) viram quebra e tabulação reais.
+     */
+    function normalizeText(raw) {
+        if (typeof raw !== "string") return "";
+        return raw
+            .replace(/\r\n?/g, "\n")
+            .replace(/\\n/g, "\n")
+            .replace(/\\t/g, "\t");
+    }
 
-// Tamanho escolhido vale para imagem e fórmula
-function applyImageSize(value) {
-    mediaBox.setAttribute('data-size', value);
-    formulaBox.setAttribute('data-size', value);
-}
-
-function applyImageLayout(value) {
-    mediaBox.setAttribute('data-layout', value);
-}
-
-function updateFormula() {
-    const value = formulaInput.value.trim();
-    formulaBox.textContent = value;
-    formulaBox.hidden = value === '';
-}
-
-function updateCover() {
-    let hasAnyText = false;
-
-    coverFields.forEach(({ input, output }) => {
-        const value = input.value.trim();
-        output.textContent = value;
-        output.hidden = value === '';
-        if (value !== '') {
-            hasAnyText = true;
+    /**
+     * Lê a mensagem de erro de uma resposta HTTP que não deu certo.
+     * Usa "error" ou "detail" do JSON, se existirem; senão, o código HTTP.
+     */
+    async function readErrorDetail(resp) {
+        let data = null;
+        try {
+            data = await resp.json();
+        } catch {
+            data = null;
         }
-    });
-
-    coverBox.hidden = !hasAnyText;
-}
-
-function openPrivacyModal(event) {
-    event.preventDefault();
-    privacyModal.showModal();
-}
-
-function closeOnBackdropClick(event) {
-    // Clique direto na própria caixa <dialog> (fora do conteúdo interno) fecha o modal
-    if (event.target === privacyModal) {
-        privacyModal.close();
-    }
-}
-
-function formatSize(bytes) {
-    if (bytes < 1024) {
-        return bytes + ' B';
-    }
-    if (bytes < 1024 * 1024) {
-        return (bytes / 1024).toFixed(1) + ' KB';
-    }
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-function isAcceptedFile(name) {
-    const lower = name.toLowerCase();
-    return ACCEPTED_EXTENSIONS.some(ext => lower.endsWith(ext));
-}
-
-function renderFileList(files) {
-    fileList.textContent = '';
-
-    if (files.length === 0) {
-        fileList.hidden = true;
-        return;
+        if (data && data.error) return String(data.error);
+        if (data && data.detail) return String(data.detail);
+        return `HTTP ${resp.status}`;
     }
 
-    files.forEach(file => {
-        const accepted = isAcceptedFile(file.name);
-
-        const item = document.createElement('li');
-        item.className = 'file-item' + (accepted ? '' : ' is-invalid');
-
-        const name = document.createElement('span');
-        name.className = 'file-name';
-        name.textContent = file.name;
-
-        const meta = document.createElement('span');
-        meta.className = 'file-size';
-        meta.textContent = accepted ? formatSize(file.size) : 'formato não aceito';
-
-        item.append(name, meta);
-        fileList.appendChild(item);
-    });
-
-    fileList.hidden = false;
-}
-
-function setDragHighlight(active) {
-    uploadZone.classList.toggle('is-dragover', active);
-}
-
-function refreshSheet() {
-    applyMargin(marginSelect.value);
-    applyFont(fontSelect.value);
-    applySize(sizeSelect.value);
-    applyImageSize(imageSizeSelect.value);
-    applyImageLayout(imageLayoutSelect.value);
-    updateCover();
-    updateFormula();
-}
-
-function formatTime(date) {
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function generatePreview() {
-    generateBtn.disabled = true;
-    sheet.setAttribute('aria-busy', 'true');
-    loadingBox.hidden = false;
-    previewStatus.textContent = 'Gerando preview...';
-
-    setTimeout(() => {
-        refreshSheet();
-        loadingBox.hidden = true;
-        sheet.removeAttribute('aria-busy');
-        generateBtn.disabled = false;
-        previewStatus.textContent = 'Preview atualizado às ' + formatTime(new Date()) + '.';
-    }, PREVIEW_DELAY_MS);
-}
-
-// Novo Documento: limpa campos de texto, arquivos, capa e fórmula. Mantém as escolhas de formatação.
-function clearDocument() {
-    promptInput.value = '';
-    linksInput.value = '';
-
-    coverFields.forEach(({ input }) => {
-        input.value = '';
-    });
-    updateCover();
-
-    formulaInput.value = '';
-    updateFormula();
-
-    fileInput.value = '';
-    renderFileList([]);
-
-    previewStatus.textContent = 'Novo documento iniciado.';
-}
-
-// Copiar Texto: usa a API moderna da área de transferência (funciona em localhost e HTTPS)
-async function copyText() {
-    const text = sheet.innerText.trim();
-
-    if (text === '') {
-        previewStatus.textContent = 'Não há texto para copiar.';
-        return;
+    /* ---------------------------------------------------------------------
+       Tema claro/escuro
+       --------------------------------------------------------------------- */
+    function applyTheme(theme) {
+        state.theme = theme;
+        document.documentElement.setAttribute("data-theme", theme);
+        const btn = $("#theme-toggle");
+        if (btn) {
+            btn.textContent = theme === "dark" ? "Modo claro" : "Modo escuro";
+            btn.setAttribute("aria-pressed", String(theme === "dark"));
+        }
     }
 
-    try {
-        await navigator.clipboard.writeText(text);
-        previewStatus.textContent = 'Texto copiado para a área de transferência.';
-    } catch {
-        previewStatus.textContent = 'Não foi possível copiar o texto.';
+    function readSavedTheme() {
+        try {
+            return localStorage.getItem(THEME_KEY);
+        } catch {
+            return null;
+        }
     }
-}
 
-// Baixar PDF: abre a caixa de impressão do navegador, que mostra só a folha A4
-function printSheet() {
-    previewStatus.textContent = 'Abrindo caixa de impressão...';
-    window.print();
-}
+    function saveTheme(theme) {
+        try {
+            localStorage.setItem(THEME_KEY, theme);
+        } catch {
+            return false;
+        }
+        return true;
+    }
 
-// Estilos aplicados dentro do arquivo .doc, para o Word reconhecer página e margens
-function buildWordCss(margin) {
-    return `
-        @page WordSection1 { size: 21cm 29.7cm; margin: ${margin}; }
-        div.WordSection1 { page: WordSection1; }
-        p { text-align: justify; margin: 0 0 10pt 0; }
-        .a4-cover { text-align: center; margin-bottom: 18pt; }
-        .a4-cover-title { font-size: 16pt; font-weight: bold; margin: 0 0 8pt 0; }
-        .a4-cover-line { text-align: center; margin: 4pt 0; }
-        .a4-title { font-size: 13pt; font-weight: bold; margin: 0 0 10pt 0; }
-        .a4-figure { text-align: center; }
-        .a4-image-placeholder { border: 1px dashed #9aa6b4; padding: 20pt; text-align: center; color: #6b7785; }
-        .a4-figure figcaption { text-align: center; font-size: 9pt; }
-        .a4-formula { text-align: center; font-style: italic; border: 1px dashed #9aa6b4; padding: 8pt; margin: 10pt 0; }
-    `;
-}
+    function initTheme() {
+        const saved = readSavedTheme();
+        if (saved === "light" || saved === "dark") {
+            applyTheme(saved);
+        } else {
+            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            applyTheme(prefersDark ? "dark" : "light");
+        }
 
-// Monta o documento com a API DOM, sem HTML escrito como texto dentro do JavaScript
-function buildWordHtml() {
-    const margin = MARGIN_CM[marginSelect.value];
-    const font = sheet.style.fontFamily || 'Arial, Helvetica, sans-serif';
-    const size = sheet.style.fontSize || '12pt';
+        on("#theme-toggle", "click", () => {
+            const next = state.theme === "dark" ? "light" : "dark";
+            saveTheme(next);
+            applyTheme(next);
+        });
+    }
 
-    const doc = document.implementation.createHTMLDocument('Documento');
-    const html = doc.documentElement;
-    html.setAttribute('lang', 'pt-BR');
-    html.setAttribute('xmlns', 'http://www.w3.org/TR/REC-html40');
-    html.setAttribute('xmlns:o', 'urn:schemas-microsoft-com:office:office');
-    html.setAttribute('xmlns:w', 'urn:schemas-microsoft-com:office:word');
+    /* ---------------------------------------------------------------------
+       Lista de arquivos enviados
+       --------------------------------------------------------------------- */
+    function renderFileList() {
+        const list = $("#file-list");
+        if (!list) return;
 
-    const meta = doc.createElement('meta');
-    meta.setAttribute('charset', 'utf-8');
+        list.textContent = "";
+        list.hidden = state.uploadedFiles.length === 0;
 
-    const style = doc.createElement('style');
-    style.textContent = buildWordCss(margin);
+        state.uploadedFiles.forEach((item) => {
+            const li = document.createElement("li");
+            li.className = "file-item";
 
-    doc.head.append(meta, style);
+            const name = document.createElement("span");
+            name.className = "file-name";
+            name.textContent = item.filename || item.stored_as || "(arquivo)";
 
-    const wrapper = doc.createElement('div');
-    wrapper.className = 'WordSection1';
-    wrapper.setAttribute('style', `font-family: ${font}; font-size: ${size}; line-height: 1.5;`);
+            const size = document.createElement("span");
+            size.className = "file-size";
+            size.textContent = formatBytes(item.size);
 
-    const content = sheet.cloneNode(true);
-    content.removeAttribute('id');
-    content.removeAttribute('style');
-    content.removeAttribute('data-margin');
-    content.removeAttribute('aria-busy');
-    content.querySelectorAll('[hidden], .a4-loading').forEach(el => el.remove());
+            li.append(name, size);
+            list.appendChild(li);
+        });
+    }
 
-    wrapper.append(...Array.from(content.childNodes));
-    doc.body.appendChild(wrapper);
+    /* ---------------------------------------------------------------------
+       3.1 — Upload via POST /api/upload
+       --------------------------------------------------------------------- */
+    async function uploadFiles(fileListLike) {
+        const files = Array.from(fileListLike || []);
+        if (files.length === 0) return;
 
-    return '<!DOCTYPE html>\n' + html.outerHTML;
-}
+        const accepted = [];
+        const rejected = [];
 
-function downloadWord() {
-    const title = coverFields[0].input.value.trim();
-    const baseName = (title || 'documento').replace(/[\\/:*?"<>|]/g, '').slice(0, 80) || 'documento';
+        files.forEach((file) => {
+            const ext = extOf(file.name);
+            if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+                rejected.push(`${file.name} (extensão ${ext || "desconhecida"})`);
+            } else if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+                rejected.push(`${file.name} (acima de ${MAX_UPLOAD_MB} MB)`);
+            } else {
+                accepted.push(file);
+            }
+        });
 
-    const blob = new Blob(['\ufeff' + buildWordHtml()], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
+        if (rejected.length > 0) {
+            setStatus(`Não enviado: ${rejected.join(", ")}`, "error");
+        }
+        if (accepted.length === 0) return;
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = baseName + '.doc';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+        setStatus(`Enviando ${accepted.length} arquivo(s)...`, "loading");
 
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    previewStatus.textContent = 'Arquivo .doc gerado. Abra no Word ou no LibreOffice.';
-}
+        const form = new FormData();
+        accepted.forEach((file) => form.append("files", file, file.name));
 
-applyTheme(getInitialTheme());
-toggleButton.addEventListener('click', toggleTheme);
+        try {
+            const resp = await fetch(API_UPLOAD, { method: "POST", body: form });
 
-applyMargin(marginSelect.value);
-marginSelect.addEventListener('change', () => applyMargin(marginSelect.value));
+            if (!resp.ok) {
+                setStatus(`Falha no upload: ${await readErrorDetail(resp)}`, "error");
+                return;
+            }
 
-applyFont(fontSelect.value);
-fontSelect.addEventListener('change', () => applyFont(fontSelect.value));
+            const data = await resp.json();
+            const uploaded = Array.isArray(data.uploads) ? data.uploads : [];
+            state.uploadedFiles.push(...uploaded);
+            renderFileList();
+            setStatus(`${uploaded.length} arquivo(s) enviado(s).`, "ok");
+        } catch (err) {
+            setStatus(`Falha de rede no upload: ${err.message}`, "error");
+        }
+    }
 
-applySize(sizeSelect.value);
-sizeSelect.addEventListener('change', () => applySize(sizeSelect.value));
+    function initUploadZone() {
+        const zone = $("#upload-zone");
+        const input = $("#file-input");
+        if (!zone || !input) return;
 
-coverFields.forEach(({ input }) => {
-    input.addEventListener('input', updateCover);
-});
+        input.addEventListener("change", () => {
+            const files = Array.from(input.files);
+            input.value = "";
+            void uploadFiles(files);
+        });
 
-updateCover();
+        zone.addEventListener("dragenter", (event) => {
+            event.preventDefault();
+            zone.classList.add("is-dragover");
+        });
 
-applyImageSize(imageSizeSelect.value);
-imageSizeSelect.addEventListener('change', () => applyImageSize(imageSizeSelect.value));
+        zone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            zone.classList.add("is-dragover");
+        });
 
-applyImageLayout(imageLayoutSelect.value);
-imageLayoutSelect.addEventListener('change', () => applyImageLayout(imageLayoutSelect.value));
+        zone.addEventListener("dragleave", (event) => {
+            event.preventDefault();
+            zone.classList.remove("is-dragover");
+        });
 
-formulaInput.addEventListener('input', updateFormula);
-updateFormula();
+        zone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            zone.classList.remove("is-dragover");
+            const files = event.dataTransfer ? Array.from(event.dataTransfer.files) : [];
+            if (files.length > 0) void uploadFiles(files);
+        });
+    }
 
-privacyLink.addEventListener('click', openPrivacyModal);
-privacyModal.addEventListener('click', closeOnBackdropClick);
+    // Impede que o navegador abra um arquivo solto fora da área de upload
+    function blockBrowserFileOpen() {
+        window.addEventListener("dragover", (event) => event.preventDefault());
+        window.addEventListener("drop", (event) => event.preventDefault());
+    }
 
-// Upload: seleção pelo clique
-fileInput.addEventListener('change', () => {
-    renderFileList(Array.from(fileInput.files));
-});
+    /* ---------------------------------------------------------------------
+       Configurações visuais da folha A4
+       --------------------------------------------------------------------- */
+    function appendLine(parent, tag, className, text) {
+        if (!text) return;
+        const el = document.createElement(tag);
+        el.className = className;
+        el.textContent = text;
+        parent.appendChild(el);
+    }
 
-// Upload: arrastar e soltar
-['dragenter', 'dragover'].forEach(type => {
-    uploadZone.addEventListener(type, event => {
-        event.preventDefault();
-        setDragHighlight(true);
-    });
-});
+    function applyCoverToSheet() {
+        const cover = $("#a4-cover");
+        if (!cover) return;
 
-['dragleave', 'drop'].forEach(type => {
-    uploadZone.addEventListener(type, event => {
-        event.preventDefault();
-        setDragHighlight(false);
-    });
-});
+        const title = fieldTrim("#cover-title");
+        const subtitle = fieldTrim("#cover-subtitle");
+        const author = fieldTrim("#cover-author");
+        const institution = fieldTrim("#cover-institution");
+        const hasAny = [title, subtitle, author, institution].some(Boolean);
 
-uploadZone.addEventListener('drop', event => {
-    renderFileList(Array.from(event.dataTransfer.files));
-});
+        cover.hidden = !hasAny;
+        cover.textContent = "";
+        if (!hasAny) return;
 
-// Impede que o navegador abra um arquivo solto fora da área de upload
-['dragover', 'drop'].forEach(type => {
-    window.addEventListener(type, event => event.preventDefault());
-});
+        appendLine(cover, "h2", "a4-cover-title", title);
+        appendLine(cover, "p", "a4-cover-line a4-cover-subtitle", subtitle);
+        appendLine(cover, "p", "a4-cover-line", author);
+        appendLine(cover, "p", "a4-cover-line", institution);
+    }
 
-// Botão Gerar/Atualizar Preview
-generateBtn.addEventListener('click', generatePreview);
+    function applyFormulaToSheet() {
+        const box = $("#a4-formula");
+        if (!box) return;
+        const text = fieldTrim("#formula-input");
+        box.hidden = text === "";
+        box.textContent = text;
+    }
 
-// Botões Baixar PDF, Baixar DOCX, Copiar Texto e Novo Documento
-pdfBtn.addEventListener('click', printSheet);
-docxBtn.addEventListener('click', downloadWord);
-copyBtn.addEventListener('click', copyText);
-newDocBtn.addEventListener('click', clearDocument);
+    function applyTypographyAndMargins() {
+        const sheet = $("#a4-sheet");
+        if (!sheet) return;
 
-// Quando a caixa de impressão fecha (salvou ou cancelou), atualiza o status
-window.addEventListener('afterprint', () => {
-    previewStatus.textContent = 'Caixa de impressão fechada.';
-});
+        const font = fieldValue("#font-select") || "arial";
+        const size = fieldValue("#size-select") || "12";
+        const margin = fieldValue("#margin-select") || "normal";
+
+        sheet.style.fontFamily = FONT_FAMILIES[font] || FONT_FAMILIES.arial;
+        sheet.style.fontSize = `${size}pt`;
+        sheet.dataset.margin = margin;
+    }
+
+    // O tamanho escolhido vale para a imagem e para a fórmula
+    function applyImageOptions() {
+        const size = fieldValue("#image-size-select") || "60";
+        const layout = fieldValue("#image-layout-select") || "below";
+
+        const media = $("#a4-media");
+        if (media) {
+            media.dataset.size = size;
+            media.dataset.layout = layout;
+        }
+
+        const formula = $("#a4-formula");
+        if (formula) formula.dataset.size = size;
+    }
+
+    function initConfigControls() {
+        ["#font-select", "#size-select", "#margin-select"].forEach((selector) => {
+            on(selector, "change", applyTypographyAndMargins);
+        });
+        ["#image-size-select", "#image-layout-select"].forEach((selector) => {
+            on(selector, "change", applyImageOptions);
+        });
+        ["#cover-title", "#cover-subtitle", "#cover-author", "#cover-institution"].forEach((selector) => {
+            on(selector, "input", applyCoverToSheet);
+        });
+        on("#formula-input", "input", applyFormulaToSheet);
+
+        applyTypographyAndMargins();
+        applyImageOptions();
+        applyCoverToSheet();
+        applyFormulaToSheet();
+    }
+
+    /* ---------------------------------------------------------------------
+       3.2 — Payload e preview via POST /api/generate-preview
+       --------------------------------------------------------------------- */
+    function getSelectedNorm() {
+        const checked = $('input[name="norm"]:checked');
+        return checked ? checked.value : "abnt";
+    }
+
+    function collectPayload() {
+        const prompt = normalizeText(fieldValue("#prompt-input")).trim();
+
+        const links = normalizeText(fieldValue("#links-input"))
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        const images = state.uploadedFiles
+            .filter((file) => IMAGE_EXTENSIONS.includes(extOf(file.stored_as || file.filename || "")))
+            .map((file) => ({ url: file.url, caption: file.filename || "" }));
+
+        return {
+            prompt,
+            content: prompt,
+            links,
+            norm: getSelectedNorm(),
+            font_family: fieldValue("#font-select") || "arial",
+            font_size: parseInt(fieldValue("#size-select") || "12", 10),
+            margin_density: fieldValue("#margin-select") || "normal",
+            cover: {
+                title: fieldTrim("#cover-title"),
+                subtitle: fieldTrim("#cover-subtitle"),
+                author: fieldTrim("#cover-author"),
+                institution: fieldTrim("#cover-institution")
+            },
+            image_size: parseInt(fieldValue("#image-size-select") || "60", 10),
+            image_layout: fieldValue("#image-layout-select") || "below",
+            formula: normalizeText(fieldValue("#formula-input")).trim(),
+            images
+        };
+    }
+
+    /**
+     * Converte o HTML recebido do servidor em nós do DOM, removendo
+     * scripts, estilos, iframes, atributos "on..." e links javascript:.
+     */
+    function sanitizeToNodes(html) {
+        const parsed = new DOMParser().parseFromString(String(html), "text/html");
+        const body = parsed.body;
+
+        UNSAFE_TAGS.forEach((tag) => {
+            body.querySelectorAll(tag).forEach((el) => el.remove());
+        });
+
+        body.querySelectorAll("*").forEach((el) => {
+            Array.from(el.attributes).forEach((attr) => {
+                const name = attr.name.toLowerCase();
+                const value = attr.value.replace(/\s/g, "").toLowerCase();
+                const isUrlAttr = name === "href" || name === "src";
+                if (name.startsWith("on") || (isUrlAttr && value.startsWith("javascript:"))) {
+                    el.removeAttribute(attr.name);
+                }
+            });
+        });
+
+        return Array.from(body.childNodes);
+    }
+
+    function renderPreviewHtml(html) {
+        const sheet = $("#a4-sheet");
+        if (!sheet) return;
+
+        let host = $("#a4-content");
+        if (!host) {
+            host = document.createElement("div");
+            host.id = "a4-content";
+            sheet.appendChild(host);
+        }
+
+        host.textContent = "";
+        sanitizeToNodes(html).forEach((node) => host.appendChild(node));
+    }
+
+    async function generatePreview() {
+        const btn = $("#generate-btn");
+        const loading = $("#a4-loading");
+
+        if (btn) btn.disabled = true;
+        if (loading) loading.hidden = false;
+        setStatus("Gerando preview...", "loading");
+
+        try {
+            const resp = await fetch(API_PREVIEW, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(collectPayload())
+            });
+
+            if (!resp.ok) {
+                setStatus(`Falha no preview: ${await readErrorDetail(resp)}`, "error");
+                return;
+            }
+
+            const data = await resp.json();
+            renderPreviewHtml(typeof data.html === "string" ? data.html : "");
+
+            const used = data.used_links ? ` (${data.used_links} link(s) usado(s))` : "";
+            setStatus(`Preview atualizado${used}.`, "ok");
+        } catch (err) {
+            setStatus(`Falha de rede no preview: ${err.message}`, "error");
+        } finally {
+            if (loading) loading.hidden = true;
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    /* ---------------------------------------------------------------------
+       3.3 — Exportação de PDF via servidor (NOVO)
+       --------------------------------------------------------------------- */
+    async function downloadPdfFromServer() {
+        const btn = $("#pdf-btn");
+        if (btn) btn.disabled = true;
+        setStatus("Gerando PDF no servidor...", "loading");
+
+        try {
+            const resp = await fetch("/api/export-pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(collectPayload())
+            });
+
+            if (!resp.ok) {
+                setStatus(`Falha ao exportar PDF: ${await readErrorDetail(resp)}`, "error");
+                return;
+            }
+
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+
+            const title = fieldTrim("#cover-title") || "documento";
+            const safeTitle = title.replace(/[\\/:*?"<>|]/g, "").slice(0, 80) || "documento";
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${safeTitle}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            setStatus("PDF gerado e baixado com sucesso.", "ok");
+        } catch (err) {
+            setStatus(`Falha de rede ao exportar PDF: ${err.message}`, "error");
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    /* ---------------------------------------------------------------------
+       Exportação para .doc (Word), montada com a API DOM
+       --------------------------------------------------------------------- */
+    function buildWordCss(margin) {
+        return `
+            @page WordSection1 { size: 21cm 29.7cm; margin: ${margin}; }
+            div.WordSection1 { page: WordSection1; }
+            p { text-align: justify; margin: 0 0 10pt 0; }
+            .a4-cover { text-align: center; margin-bottom: 18pt; }
+            .a4-cover-title { font-size: 16pt; font-weight: bold; margin: 0 0 8pt 0; }
+            .a4-cover-line { text-align: center; margin: 4pt 0; }
+            .a4-title { font-size: 13pt; font-weight: bold; margin: 0 0 10pt 0; }
+            .a4-figure { text-align: center; }
+            .a4-image-placeholder { border: 1px dashed #9aa6b4; padding: 20pt; text-align: center; color: #6b7785; }
+            .a4-figure figcaption { text-align: center; font-size: 9pt; }
+            .a4-formula { text-align: center; font-style: italic; border: 1px dashed #9aa6b4; padding: 8pt; margin: 10pt 0; }
+        `;
+    }
+
+    function buildWordDocument(sheet) {
+        const doc = document.implementation.createHTMLDocument("Documento");
+        const html = doc.documentElement;
+        html.setAttribute("lang", "pt-BR");
+        html.setAttribute("xmlns", "http://www.w3.org/TR/REC-html40");
+        html.setAttribute("xmlns:o", "urn:schemas-microsoft-com:office:office");
+        html.setAttribute("xmlns:w", "urn:schemas-microsoft-com:office:word");
+
+        const meta = doc.createElement("meta");
+        meta.setAttribute("charset", "utf-8");
+
+        const style = doc.createElement("style");
+        style.textContent = buildWordCss(MARGIN_CM[fieldValue("#margin-select")] || MARGIN_CM.normal);
+
+        doc.head.append(meta, style);
+
+        const wrapper = doc.createElement("div");
+        wrapper.className = "WordSection1";
+        wrapper.setAttribute(
+            "style",
+            `font-family: ${sheet.style.fontFamily || "Arial, sans-serif"}; font-size: ${sheet.style.fontSize || "12pt"}; line-height: 1.5;`
+        );
+
+        const content = sheet.cloneNode(true);
+        content.removeAttribute("id");
+        content.removeAttribute("style");
+        content.removeAttribute("data-margin");
+        content.querySelectorAll("[hidden], .a4-loading").forEach((el) => el.remove());
+
+        wrapper.append(...Array.from(content.childNodes));
+        doc.body.appendChild(wrapper);
+
+        return "<!DOCTYPE html>\n" + html.outerHTML;
+    }
+
+    function downloadWord() {
+        const sheet = $("#a4-sheet");
+        if (!sheet) return;
+
+        const title = fieldTrim("#cover-title");
+        const baseName = (title || "documento").replace(/[\\/:*?"<>|]/g, "").slice(0, 80) || "documento";
+
+        const blob = new Blob(["\ufeff" + buildWordDocument(sheet)], { type: "application/msword" });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${baseName}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setStatus("Arquivo .doc gerado. Abra no Word ou no LibreOffice.", "ok");
+    }
+
+    /* ---------------------------------------------------------------------
+       Copiar texto e novo documento
+       --------------------------------------------------------------------- */
+    async function copyText() {
+        const sheet = $("#a4-sheet");
+        if (!sheet) return;
+
+        const text = sheet.innerText.trim();
+        if (text === "") {
+            setStatus("Não há texto para copiar.", "error");
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            setStatus("Texto copiado para a área de transferência.", "ok");
+        } catch {
+            setStatus("Não foi possível copiar o texto.", "error");
+        }
+    }
+
+    function clearDocument() {
+        [
+            "#prompt-input",
+            "#links-input",
+            "#cover-title",
+            "#cover-subtitle",
+            "#cover-author",
+            "#cover-institution",
+            "#formula-input"
+        ].forEach((selector) => {
+            const el = $(selector);
+            if (el) el.value = "";
+        });
+
+        state.uploadedFiles = [];
+        renderFileList();
+
+        const host = $("#a4-content");
+        if (host) host.textContent = "";
+
+        applyCoverToSheet();
+        applyFormulaToSheet();
+        setStatus("Novo documento iniciado.", "ok");
+    }
+
+    /* ---------------------------------------------------------------------
+       Barra de ferramentas e modal de LGPD
+       --------------------------------------------------------------------- */
+    function initToolbar() {
+        on("#generate-btn", "click", () => {
+            void generatePreview();
+        });
+
+        // AQUI ESTÁ A MUDANÇA DA ETAPA 3.3 (Não usa mais window.print())
+        on("#pdf-btn", "click", () => {
+            void downloadPdfFromServer();
+        });
+
+        on("#docx-btn", "click", downloadWord);
+        on("#copy-btn", "click", () => {
+            void copyText();
+        });
+        on("#new-doc-btn", "click", clearDocument);
+    }
+
+    function initPrivacyModal() {
+        const link = $("#privacy-link");
+        const modal = $("#privacy-modal");
+        if (!link || !modal) return;
+
+        link.addEventListener("click", (event) => {
+            event.preventDefault();
+            modal.showModal();
+        });
+
+        // Clique direto na caixa do <dialog> (fora do conteúdo interno) fecha o modal
+        modal.addEventListener("click", (event) => {
+            if (event.target === modal) modal.close();
+        });
+    }
+
+    /* ---------------------------------------------------------------------
+       Inicialização
+       --------------------------------------------------------------------- */
+    function init() {
+        initTheme();
+        initUploadZone();
+        blockBrowserFileOpen();
+        initConfigControls();
+        initToolbar();
+        initPrivacyModal();
+        renderFileList();
+        setStatus("Pronto.", "ok");
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+})();

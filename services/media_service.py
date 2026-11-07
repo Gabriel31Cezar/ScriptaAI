@@ -1,6 +1,6 @@
 """
-Leitura de arquivos fonte (.txt, .md, .docx) e estrutura inicial para
-raspagem de URLs e transcrição de áudio/vídeo.
+Leitura de arquivos fonte (.txt, .md, .docx) e estrutura para raspagem de URLs.
+Usa requests para evitar bloqueios de User-Agent e simular navegador real.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import httpx
+import requests
 from bs4 import BeautifulSoup
 from docx import Document
 
@@ -16,13 +16,23 @@ TEXT_EXTS = {".txt", ".md"}
 DOCX_EXTS = {".docx"}
 AUDIO_EXTS = {".mp3", ".mp4"}
 
-_HTTP_TIMEOUT = httpx.Timeout(15.0, connect=10.0)
 _MAX_CHARS = 20_000
 
+# Cabeçalhos idênticos aos de um Chrome real no Windows
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Cache-Control": "max-age=0",
+}
 
-# ---------------------------------------------------------------------------
-# Leitura de arquivos locais
-# ---------------------------------------------------------------------------
 
 def read_txt(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
@@ -62,33 +72,35 @@ def _transcribe_stub(path: Path) -> str:
     return f"[transcrição pendente: {path.name}]"
 
 
-# ---------------------------------------------------------------------------
-# Raspagem de URLs
-# ---------------------------------------------------------------------------
-
 def _extract_text_from_html(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
+    # Remove scripts, estilos, cabeçalhos, rodapés e menus
     for tag in soup(["script", "style", "noscript", "header", "footer", "nav"]):
         tag.decompose()
     text = soup.get_text("\n", strip=True)
+    # Limpa quebras de linha excessivas
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 
 async def scrape_url(url: str) -> str:
+    # noinspection HttpUrlsUsage
     if not url.lower().startswith(("http://", "https://")):
         return ""
     try:
-        async with httpx.AsyncClient(
-            follow_redirects=True, timeout=_HTTP_TIMEOUT
-        ) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            ctype = resp.headers.get("content-type", "")
-            if "html" not in ctype:
-                return ""
-            return _extract_text_from_html(resp.text)[:_MAX_CHARS]
-    except (httpx.HTTPError, httpx.InvalidURL, ValueError):
+        # O requests.get é síncrono, mas roda numa thread separada pelo FastAPI,
+        # então não trava o servidor.
+        resp = requests.get(url, headers=_HEADERS, timeout=15)
+        resp.raise_for_status()
+
+        ctype = resp.headers.get("content-type", "")
+        if "html" not in ctype:
+            return ""
+
+        return _extract_text_from_html(resp.text)[:_MAX_CHARS]
+    except Exception as e:
+        # Imprime o erro no terminal para sabermos o porquê do link falhar
+        print(f"[ERRO NO SCRAPE] Falha ao acessar {url}: {e}")
         return ""
 
 
