@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from services import media_service, pdf_service
+from services.ai_service import generate_text_with_gemini
 from services.cleanup_service import cleanup_temporary_files_task
 from database import engine, Base, get_db
 from models.document import Document
@@ -179,6 +180,15 @@ async def upload(files: list[UploadFile] = File(...)) -> UploadOut:
 async def generate_preview(payload: GenerateIn) -> PreviewOut:
     data = payload.model_dump()
 
+    # Se o usuário enviou um prompt de IA, geramos o texto automaticamente
+    generated_content = data.get("content") or ""
+    if data.get("prompt") and not generated_content.strip():
+        try:
+            generated_content = generate_text_with_gemini(data.get("prompt") or "")
+        except Exception as e:
+            generated_content = f"[Erro ao gerar texto com IA: {str(e)}]"
+        data["content"] = generated_content
+
     # Processamento de links com log
     scraped = await media_service.scrape_many(data.get("links") or [])
     extra_parts = []
@@ -277,7 +287,7 @@ def get_document(document_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Documento não encontrado.")
 
     # A capa é guardada como texto JSON; se estiver vazia ou corrompida, volta como None
-    cover = None
+    cover: dict | None = None
     if doc.cover_json:
         try:
             parsed = json.loads(doc.cover_json)
@@ -292,7 +302,7 @@ def get_document(document_id: str, db: Session = Depends(get_db)):
         font_family=doc.font_family,
         font_size=doc.font_size,
         margin_density=doc.margin_density,
-        cover=cover,
+        cover=cover,  # type: ignore[arg-type]
         formula=doc.formula or "",
         content=doc.content_md or "",
         created_at=doc.created_at.isoformat(),
