@@ -189,6 +189,12 @@ select.field {
     border-color: var(--accent);
 }
 
+.upload-zone:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-color: var(--accent);
+}
+
 .upload-zone.is-dragover {
     border-color: var(--accent);
     background: var(--surface);

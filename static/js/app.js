@@ -214,15 +214,28 @@
         }
     }
 
-    function initUploadZone() {
+        function initUploadZone() {
         const zone = $("#upload-zone");
         const input = $("#file-input");
         if (!zone || !input) return;
+
+        const openPicker = () => input.click();
 
         input.addEventListener("change", () => {
             const files = Array.from(input.files);
             input.value = "";
             void uploadFiles(files);
+        });
+
+        // Clique com o mouse abre o seletor
+        zone.addEventListener("click", openPicker);
+
+        // Teclado: Enter ou Espaço também abrem o seletor
+        zone.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openPicker();
+            }
         });
 
         zone.addEventListener("dragenter", (event) => {

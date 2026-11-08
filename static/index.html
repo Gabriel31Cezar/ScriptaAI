@@ -28,13 +28,14 @@
                 <textarea id="links-input" class="field" rows="3"
                           placeholder="Cole um link por linha"></textarea>
 
-                <span class="field-label">Arquivos fonte</span>
-                <label class="upload-zone" id="upload-zone" for="file-input">
-                    <span>Clique ou arraste arquivos aqui</span>
-                    <small>.txt, .md, .docx, .mp3, .mp4, .png, .pdf</small>
-                    <input type="file" id="file-input" multiple
-                           accept=".txt,.md,.docx,.mp3,.mp4,.png,.pdf" hidden>
-                </label>
+                <span class="field-label" id="files-label">Arquivos fonte</span>
+                <div class="upload-zone" id="upload-zone" role="button" tabindex="0"
+                     aria-labelledby="files-label upload-hint" aria-describedby="upload-hint">
+                    <span>Clique, arraste ou pressione Enter para escolher arquivos</span>
+                    <small id="upload-hint">.txt, .md, .docx, .mp3, .mp4, .png, .pdf</small>
+                </div>
+                <input type="file" id="file-input" multiple
+                       accept=".txt,.md,.docx,.mp3,.mp4,.png,.pdf" hidden>
                 <ul class="file-list" id="file-list" hidden></ul>
             </section>
 
@@ -160,7 +161,7 @@
             <div class="toolbar" role="toolbar" aria-label="Ações do documento">
                 <button type="button" id="generate-btn" class="tool-btn tool-btn-primary">Gerar/Atualizar Preview</button>
                 <button type="button" id="pdf-btn" class="tool-btn">Baixar PDF</button>
-                <button type="button" id="docx-btn" class="tool-btn">Baixar DOCX</button>
+                <button type="button" id="docx-btn" class="tool-btn">Baixar Word (.doc)</button>
                 <button type="button" id="copy-btn" class="tool-btn">Copiar Texto</button>
                 <button type="button" id="new-doc-btn" class="tool-btn">Novo Documento</button>
             </div>
@@ -206,7 +207,7 @@
 
     <footer class="footer">
         <span>&copy; 2026 ScriptaAI. Todos os direitos reservados.</span>
-        <a href="#privacidade" id="privacy-link">Política de Privacidade &amp; Termos (LGPD)</a>
+        <a href="#privacy-modal" id="privacy-link">Política de Privacidade &amp; Termos (LGPD)</a>
     </footer>
 
     <dialog id="privacy-modal" class="privacy-modal" aria-labelledby="privacy-title">
