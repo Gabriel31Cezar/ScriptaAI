@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap");
+
 [hidden] {
     display: none !important;
 }
@@ -49,8 +51,10 @@ body {
 /* Cabeçalho */
 .topbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     padding: 12px 24px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -77,6 +81,11 @@ body {
     border-color: var(--accent);
 }
 
+.btn-theme:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 /* Layout principal */
 .layout {
     flex: 1;
@@ -93,6 +102,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 16px;
+    min-width: 0;
 }
 
 .sidebar {
@@ -116,17 +126,6 @@ body {
 .sidebar-section h3 {
     margin: 0 0 6px;
     font-size: 0.95rem;
-}
-
-@media (max-width: 768px) {
-    .layout {
-        grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-        position: static;
-        max-height: none;
-    }
 }
 
 /* Campos */
@@ -719,6 +718,87 @@ select.field {
     justify-content: flex-end;
 }
 
+/* ==========================================================================
+   Responsividade
+   ========================================================================== */
+
+/* Tablets e celulares na vertical: uma coluna, margens da folha menores */
+@media (max-width: 768px) {
+    .topbar {
+        padding: 10px 12px;
+    }
+
+    .layout {
+        grid-template-columns: 1fr;
+        padding: 8px;
+        gap: 12px;
+    }
+
+    .sidebar {
+        position: static;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .main-panel {
+        padding: 12px;
+    }
+
+    .preview-area {
+        padding: 12px;
+    }
+
+    .a4-sheet[data-margin="narrow"] {
+        padding: 1cm;
+    }
+
+    .a4-sheet[data-margin="normal"] {
+        padding: 1.5cm;
+    }
+
+    .a4-sheet[data-margin="wide"] {
+        padding: 2cm;
+    }
+
+    /* Em tela estreita, "Texto ao lado" vira coluna para não espremer o texto */
+    .a4-media[data-layout="side"] {
+        flex-direction: column;
+    }
+
+    .a4-media[data-layout="side"] .a4-figure {
+        flex: none;
+        max-width: 100%;
+    }
+
+    .footer {
+        padding: 10px 12px;
+    }
+}
+
+/* Celulares: botões de ação em duas colunas */
+@media (max-width: 480px) {
+    .toolbar .tool-btn {
+        flex: 1 1 calc(50% - 8px);
+        text-align: center;
+    }
+
+    .a4-sheet {
+        font-size: 11pt;
+    }
+
+    .a4-sheet[data-margin="narrow"] {
+        padding: 0.8cm;
+    }
+
+    .a4-sheet[data-margin="normal"] {
+        padding: 1.2cm;
+    }
+
+    .a4-sheet[data-margin="wide"] {
+        padding: 1.6cm;
+    }
+}
+
 /* Impressão e PDF: a folha A4 flui por quantas páginas forem necessárias */
 @media print {
     @page {
@@ -777,5 +857,38 @@ select.field {
     .a4-sheet p {
         orphans: 3;
         widows: 3;
+    }
+}
+
+/* ==========================================================================
+   Item da lista com botão "Abrir"
+   ========================================================================== */
+
+.doc-item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.doc-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.doc-open {
+    flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+    .doc-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .doc-open {
+        width: 100%;
     }
 }

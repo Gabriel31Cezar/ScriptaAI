@@ -44,6 +44,27 @@ class DocumentOut(BaseModel):
         from_attributes = True
 
 
+class CoverOut(BaseModel):
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    author: Optional[str] = None
+    institution: Optional[str] = None
+
+
+class DocumentDetailOut(BaseModel):
+    id: str
+    title: Optional[str]
+    norm: str
+    font_family: str
+    font_size: int
+    margin_density: str
+    cover: Optional[CoverOut] = None
+    formula: str = ""
+    content: str = ""
+    created_at: str
+    updated_at: Optional[str] = None
+
+
 class PreviewOut(BaseModel):
     html: str
     used_links: int = 0

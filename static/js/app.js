@@ -1,6 +1,8 @@
 /* ==========================================================================
    ScriptaAI — app.js
-   Etapa 1 (interface) + 3.1 (upload via API) + 3.2 (preview via API)
+   Etapa 1 (interface) + 3.1 (upload) + 3.2 (preview) + 3.3 (exportação)
+   + Etapa 5 (carregamento, mensagens amigáveis, teclado, salvar documento,
+   lista de documentos salvos, abrir documento salvo)
    ========================================================================== */
 
 (() => {
@@ -10,6 +12,8 @@
     const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
     const API_UPLOAD = "/api/upload";
     const API_PREVIEW = "/api/generate-preview";
+    const API_EXPORT_PDF = "/api/export-pdf";
+    const API_DOCUMENTS = "/api/documents";
     const MAX_UPLOAD_MB = 25;
     const THEME_KEY = "scripta-theme";
     const MARGIN_CM = { narrow: "1.5cm", normal: "2.5cm", wide: "3.5cm" };
@@ -21,6 +25,25 @@
     };
     // Elementos removidos do HTML que vem do servidor, por segurança
     const UNSAFE_TAGS = ["script", "style", "iframe", "object", "embed", "link", "meta", "base", "form"];
+
+    // Mensagens amigáveis para códigos HTTP comuns
+    const HTTP_MESSAGES = {
+        400: "A requisição não pôde ser processada. Revise os dados e tente de novo.",
+        404: "Serviço não encontrado. Verifique se o servidor está em execução.",
+        413: "Arquivo grande demais para ser enviado.",
+        415: "Tipo de arquivo não suportado.",
+        422: "Alguns dados estão inválidos. Confira o formulário e tente de novo.",
+        500: "Erro interno no servidor. Tente novamente em instantes.",
+        503: "Servidor indisponível no momento. Tente novamente em instantes."
+    };
+
+    // Rótulos legíveis das normas, usados na lista de documentos salvos
+    const NORM_LABELS = {
+        abnt: "ABNT",
+        "apa-ieee": "APA / IEEE",
+        executivo: "Executivo Moderno",
+        apostila: "Apostila Compacta"
+    };
 
     const state = {
         theme: "light",
@@ -39,6 +62,11 @@
 
     const fieldTrim = (selector) => fieldValue(selector).trim();
 
+    const setValue = (selector, value) => {
+        const el = $(selector);
+        if (el) el.value = value;
+    };
+
     function on(selector, eventName, handler) {
         const el = $(selector);
         if (el) el.addEventListener(eventName, handler);
@@ -46,6 +74,13 @@
 
     function setStatus(message, kind = "") {
         const el = $("#preview-status");
+        if (!el) return;
+        el.textContent = message;
+        el.dataset.kind = kind;
+    }
+
+    function setDocsStatus(message, kind = "") {
+        const el = $("#docs-status");
         if (!el) return;
         el.textContent = message;
         el.dataset.kind = kind;
@@ -76,9 +111,13 @@
             .replace(/\\t/g, "\t");
     }
 
+    /* ---------------------------------------------------------------------
+       Mensagens de erro e estados de carregamento
+       --------------------------------------------------------------------- */
+
     /**
-     * Lê a mensagem de erro de uma resposta HTTP que não deu certo.
-     * Usa "error" ou "detail" do JSON, se existirem; senão, o código HTTP.
+     * Converte uma resposta HTTP de erro em uma mensagem curta em português.
+     * O detalhe técnico do servidor vai para o console, para depuração.
      */
     async function readErrorDetail(resp) {
         let data = null;
@@ -87,9 +126,37 @@
         } catch {
             data = null;
         }
-        if (data && data.error) return String(data.error);
-        if (data && data.detail) return String(data.detail);
-        return `HTTP ${resp.status}`;
+        const detail = data ? String(data.error || data.detail || "") : "";
+        if (detail) console.error(`[ScriptaAI] HTTP ${resp.status}: ${detail}`);
+
+        if (HTTP_MESSAGES[resp.status]) return HTTP_MESSAGES[resp.status];
+        return `Erro inesperado (código ${resp.status}). Tente novamente.`;
+    }
+
+    /**
+     * Mensagem para falhas de rede (servidor desligado, sem conexão, etc.).
+     * O erro técnico original vai para o console.
+     */
+    function friendlyNetworkError(err) {
+        console.error("[ScriptaAI] Falha de rede:", err);
+        return "Não foi possível conectar ao servidor. Verifique se ele está em execução e tente novamente.";
+    }
+
+    /**
+     * Troca o rótulo do botão durante a ação e restaura o original ao final.
+     */
+    function setBusy(btn, busy, busyLabel = "Aguarde...") {
+        if (!btn) return;
+        if (busy) {
+            if (!btn.dataset.idleLabel) btn.dataset.idleLabel = btn.textContent;
+            btn.textContent = busyLabel;
+            btn.disabled = true;
+            btn.setAttribute("aria-busy", "true");
+        } else {
+            btn.textContent = btn.dataset.idleLabel || btn.textContent;
+            btn.disabled = false;
+            btn.removeAttribute("aria-busy");
+        }
     }
 
     /* ---------------------------------------------------------------------
@@ -166,7 +233,7 @@
     }
 
     /* ---------------------------------------------------------------------
-       3.1 — Upload via POST /api/upload
+       Upload via POST /api/upload
        --------------------------------------------------------------------- */
     async function uploadFiles(fileListLike) {
         const files = Array.from(fileListLike || []);
@@ -200,7 +267,7 @@
             const resp = await fetch(API_UPLOAD, { method: "POST", body: form });
 
             if (!resp.ok) {
-                setStatus(`Falha no upload: ${await readErrorDetail(resp)}`, "error");
+                setStatus(`Não foi possível enviar os arquivos. ${await readErrorDetail(resp)}`, "error");
                 return;
             }
 
@@ -210,11 +277,11 @@
             renderFileList();
             setStatus(`${uploaded.length} arquivo(s) enviado(s).`, "ok");
         } catch (err) {
-            setStatus(`Falha de rede no upload: ${err.message}`, "error");
+            setStatus(friendlyNetworkError(err), "error");
         }
     }
 
-        function initUploadZone() {
+    function initUploadZone() {
         const zone = $("#upload-zone");
         const input = $("#file-input");
         if (!zone || !input) return;
@@ -353,7 +420,7 @@
     }
 
     /* ---------------------------------------------------------------------
-       3.2 — Payload e preview via POST /api/generate-preview
+       Payload e preview via POST /api/generate-preview
        --------------------------------------------------------------------- */
     function getSelectedNorm() {
         const checked = $('input[name="norm"]:checked');
@@ -434,11 +501,15 @@
         sanitizeToNodes(html).forEach((node) => host.appendChild(node));
     }
 
+    /**
+     * Gera o preview. Retorna true em caso de sucesso e false em caso de erro,
+     * para quem chamar decidir qual mensagem mostrar depois.
+     */
     async function generatePreview() {
         const btn = $("#generate-btn");
         const loading = $("#a4-loading");
 
-        if (btn) btn.disabled = true;
+        setBusy(btn, true, "Gerando...");
         if (loading) loading.hidden = false;
         setStatus("Gerando preview...", "loading");
 
@@ -450,8 +521,8 @@
             });
 
             if (!resp.ok) {
-                setStatus(`Falha no preview: ${await readErrorDetail(resp)}`, "error");
-                return;
+                setStatus(`Não foi possível gerar o preview. ${await readErrorDetail(resp)}`, "error");
+                return false;
             }
 
             const data = await resp.json();
@@ -459,31 +530,226 @@
 
             const used = data.used_links ? ` (${data.used_links} link(s) usado(s))` : "";
             setStatus(`Preview atualizado${used}.`, "ok");
+            return true;
         } catch (err) {
-            setStatus(`Falha de rede no preview: ${err.message}`, "error");
+            setStatus(friendlyNetworkError(err), "error");
+            return false;
         } finally {
             if (loading) loading.hidden = true;
-            if (btn) btn.disabled = false;
+            setBusy(btn, false);
         }
     }
 
     /* ---------------------------------------------------------------------
-       3.3 — Exportação de PDF via servidor (NOVO)
+       Salvar documento via POST /api/documents
        --------------------------------------------------------------------- */
-    async function downloadPdfFromServer() {
-        const btn = $("#pdf-btn");
-        if (btn) btn.disabled = true;
-        setStatus("Gerando PDF no servidor...", "loading");
+    async function saveDocument() {
+        const btn = $("#save-doc-btn");
+        setBusy(btn, true, "Salvando...");
+        setStatus("Salvando documento...", "loading");
 
         try {
-            const resp = await fetch("/api/export-pdf", {
+            const resp = await fetch(API_DOCUMENTS, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(collectPayload())
             });
 
             if (!resp.ok) {
-                setStatus(`Falha ao exportar PDF: ${await readErrorDetail(resp)}`, "error");
+                setStatus(`Não foi possível salvar o documento. ${await readErrorDetail(resp)}`, "error");
+                return;
+            }
+
+            const data = await resp.json();
+            setStatus(`Documento salvo: "${data.title}".`, "ok");
+            // Atualiza a lista para mostrar o documento recém-salvo
+            void loadDocuments();
+        } catch (err) {
+            setStatus(friendlyNetworkError(err), "error");
+        } finally {
+            setBusy(btn, false);
+        }
+    }
+
+    /* ---------------------------------------------------------------------
+       Lista de documentos salvos via GET /api/documents
+       --------------------------------------------------------------------- */
+
+    /**
+     * Formata a data vinda do servidor. Se não for possível, mostra o texto original.
+     */
+    function formatDate(isoText) {
+        const date = new Date(isoText);
+        if (Number.isNaN(date.getTime())) return isoText || "";
+        return date.toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+    }
+
+    function renderDocumentsList(docs) {
+        const list = $("#docs-list");
+        if (!list) return;
+
+        list.textContent = "";
+        list.hidden = docs.length === 0;
+
+        docs.forEach((doc) => {
+            const li = document.createElement("li");
+            li.className = "doc-item";
+
+            const info = document.createElement("div");
+            info.className = "doc-info";
+
+            const title = document.createElement("span");
+            title.className = "doc-title";
+            title.textContent = doc.title || "Documento sem Título";
+
+            const meta = document.createElement("span");
+            meta.className = "doc-meta";
+            const norm = NORM_LABELS[doc.norm] || doc.norm || "";
+            meta.textContent = `${norm} · ${formatDate(doc.created_at)}`;
+
+            info.append(title, meta);
+
+            const openBtn = document.createElement("button");
+            openBtn.type = "button";
+            openBtn.className = "tool-btn doc-open";
+            openBtn.textContent = "Abrir";
+            openBtn.setAttribute("aria-label", `Abrir documento ${doc.title || "sem título"}`);
+            openBtn.addEventListener("click", () => {
+                void openDocument(doc.id, openBtn);
+            });
+
+            li.append(info, openBtn);
+            list.appendChild(li);
+        });
+    }
+
+    async function loadDocuments() {
+        const btn = $("#refresh-docs-btn");
+        setBusy(btn, true, "Atualizando...");
+        setDocsStatus("Carregando documentos salvos...", "loading");
+
+        try {
+            const resp = await fetch(API_DOCUMENTS);
+
+            if (!resp.ok) {
+                renderDocumentsList([]);
+                setDocsStatus(`Não foi possível carregar a lista. ${await readErrorDetail(resp)}`, "error");
+                return;
+            }
+
+            const docs = await resp.json();
+            const items = Array.isArray(docs) ? docs : [];
+            renderDocumentsList(items);
+
+            setDocsStatus(
+                items.length === 0
+                    ? "Nenhum documento salvo ainda."
+                    : `${items.length} documento(s) salvo(s).`,
+                "ok"
+            );
+        } catch (err) {
+            renderDocumentsList([]);
+            setDocsStatus(friendlyNetworkError(err), "error");
+        } finally {
+            setBusy(btn, false);
+        }
+    }
+
+    /* ---------------------------------------------------------------------
+       Abrir documento salvo via GET /api/documents/{id}
+       --------------------------------------------------------------------- */
+
+    /**
+     * Preenche o formulário com os dados do documento salvo.
+     * Links e arquivos enviados não são salvos no banco, então não voltam.
+     */
+    function applyDocumentToForm(doc) {
+        setValue("#prompt-input", doc.content || "");
+        setValue("#links-input", "");
+
+        document.querySelectorAll('input[name="norm"]').forEach((radio) => {
+            radio.checked = radio.value === doc.norm;
+        });
+
+        setValue("#font-select", doc.font_family || "arial");
+        setValue("#size-select", String(doc.font_size || 12));
+        setValue("#margin-select", doc.margin_density || "normal");
+
+        const cover = doc.cover || {};
+        setValue("#cover-title", cover.title || "");
+        setValue("#cover-subtitle", cover.subtitle || "");
+        setValue("#cover-author", cover.author || "");
+        setValue("#cover-institution", cover.institution || "");
+
+        setValue("#formula-input", doc.formula || "");
+
+        state.uploadedFiles = [];
+        renderFileList();
+
+        applyTypographyAndMargins();
+        applyImageOptions();
+        applyCoverToSheet();
+        applyFormulaToSheet();
+    }
+
+    async function openDocument(docId, btn) {
+        const promptEl = $("#prompt-input");
+        const hasCurrentText = promptEl && promptEl.value.trim() !== "";
+        if (hasCurrentText && !window.confirm("Abrir este documento vai substituir o conteúdo atual da tela. Continuar?")) {
+            return;
+        }
+
+        setBusy(btn, true, "Abrindo...");
+        setStatus("Abrindo documento salvo...", "loading");
+
+        try {
+            const resp = await fetch(`${API_DOCUMENTS}/${encodeURIComponent(docId)}`);
+
+            if (!resp.ok) {
+                setStatus(`Não foi possível abrir o documento. ${await readErrorDetail(resp)}`, "error");
+                return;
+            }
+
+            const doc = await resp.json();
+            applyDocumentToForm(doc);
+
+            const previewOk = await generatePreview();
+            if (previewOk) {
+                setStatus(
+                    `Documento aberto: "${doc.title}". Links e arquivos enviados não são restaurados.`,
+                    "ok"
+                );
+            }
+        } catch (err) {
+            setStatus(friendlyNetworkError(err), "error");
+        } finally {
+            setBusy(btn, false);
+        }
+    }
+
+    /* ---------------------------------------------------------------------
+       Exportação de PDF via servidor
+       --------------------------------------------------------------------- */
+    async function downloadPdfFromServer() {
+        const btn = $("#pdf-btn");
+        setBusy(btn, true, "Gerando PDF...");
+        setStatus("Gerando PDF no servidor. Isso pode levar alguns segundos.", "loading");
+
+        try {
+            const resp = await fetch(API_EXPORT_PDF, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(collectPayload())
+            });
+
+            if (!resp.ok) {
+                setStatus(`Não foi possível gerar o PDF. ${await readErrorDetail(resp)}`, "error");
                 return;
             }
 
@@ -503,9 +769,9 @@
             setTimeout(() => URL.revokeObjectURL(url), 1000);
             setStatus("PDF gerado e baixado com sucesso.", "ok");
         } catch (err) {
-            setStatus(`Falha de rede ao exportar PDF: ${err.message}`, "error");
+            setStatus(friendlyNetworkError(err), "error");
         } finally {
-            if (btn) btn.disabled = false;
+            setBusy(btn, false);
         }
     }
 
@@ -563,25 +829,37 @@
         return "<!DOCTYPE html>\n" + html.outerHTML;
     }
 
-    function downloadWord() {
+    async function downloadWord() {
         const sheet = $("#a4-sheet");
+        const btn = $("#docx-btn");
         if (!sheet) return;
 
-        const title = fieldTrim("#cover-title");
-        const baseName = (title || "documento").replace(/[\\/:*?"<>|]/g, "").slice(0, 80) || "documento";
+        setBusy(btn, true, "Gerando Word...");
+        // Espera um quadro para o rótulo "Gerando Word..." aparecer antes do trabalho pesado
+        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
-        const blob = new Blob(["\ufeff" + buildWordDocument(sheet)], { type: "application/msword" });
-        const url = URL.createObjectURL(blob);
+        try {
+            const title = fieldTrim("#cover-title");
+            const baseName = (title || "documento").replace(/[\\/:*?"<>|]/g, "").slice(0, 80) || "documento";
 
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${baseName}.doc`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+            const blob = new Blob(["\ufeff" + buildWordDocument(sheet)], { type: "application/msword" });
+            const url = URL.createObjectURL(blob);
 
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        setStatus("Arquivo .doc gerado. Abra no Word ou no LibreOffice.", "ok");
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${baseName}.doc`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            setStatus("Arquivo Word (.doc) gerado. Abra no Word ou no LibreOffice.", "ok");
+        } catch (err) {
+            console.error("[ScriptaAI] Erro ao gerar .doc:", err);
+            setStatus("Não foi possível gerar o arquivo Word. Tente novamente.", "error");
+        } finally {
+            setBusy(btn, false);
+        }
     }
 
     /* ---------------------------------------------------------------------
@@ -638,16 +916,27 @@
             void generatePreview();
         });
 
-        // AQUI ESTÁ A MUDANÇA DA ETAPA 3.3 (Não usa mais window.print())
+        on("#save-doc-btn", "click", () => {
+            void saveDocument();
+        });
+
         on("#pdf-btn", "click", () => {
             void downloadPdfFromServer();
         });
 
-        on("#docx-btn", "click", downloadWord);
+        on("#docx-btn", "click", () => {
+            void downloadWord();
+        });
+
         on("#copy-btn", "click", () => {
             void copyText();
         });
+
         on("#new-doc-btn", "click", clearDocument);
+
+        on("#refresh-docs-btn", "click", () => {
+            void loadDocuments();
+        });
     }
 
     function initPrivacyModal() {
@@ -678,6 +967,7 @@
         initPrivacyModal();
         renderFileList();
         setStatus("Pronto.", "ok");
+        void loadDocuments();
     }
 
     document.addEventListener("DOMContentLoaded", init);

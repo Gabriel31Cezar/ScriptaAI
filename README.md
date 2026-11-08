@@ -121,3 +121,154 @@ A qualidade e a estabilidade do backend são garantidas por uma suíte de testes
 ### Configuração do Ambiente
 - **`pytest.ini`:** Define o modo assíncrono (`asyncio_mode = auto`) e restrições de execução (`--strict-markers`).
 - **`requirements-dev.txt`:** Isola as dependências de teste (`pytest`, `pytest-asyncio`) das dependências de produção para manter o servidor leve.
+
+---
+
+## Documentação Técnica Final (Etapa 5)
+
+Esta seção descreve a versão final do projeto, incluindo a interface de persistência, a lista e a reabertura de documentos salvos e a documentação de uso.
+
+### Funcionalidades
+
+- Entrada de conteúdo por prompt, links e arquivos de apoio.
+- Formatação por norma: ABNT, APA/IEEE, Executivo Moderno e Apostila Compacta.
+- Tipografia com Arial, Times New Roman, Roboto ou Monospace, tamanho do texto e densidade de margem.
+- Capa, imagens, fórmula em texto e pré-visualização em folha A4.
+- Exportação em PDF pelo servidor e em `.doc` pelo navegador.
+- Salvar documentos, listar os salvos e reabri-los pela lista.
+- Tema claro e escuro, com layout responsivo.
+
+### Tecnologias
+
+- Python 3.13, FastAPI e Pydantic v2
+- SQLAlchemy com SQLite
+- WeasyPrint (geração de PDF)
+- Pytest (testes automatizados)
+- HTML5, CSS3 e JavaScript puro
+
+### Estrutura do projeto
+
+```
+ScriptaAI/
+├── main.py                    # Aplicação FastAPI e rotas da API
+├── database.py                # Conexão com o banco SQLite
+├── models/
+│   └── document.py            # Modelos do banco
+├── schemas/
+│   └── document.py            # Schemas de entrada e saída (Pydantic)
+├── services/
+│   ├── cleanup_service.py     # Limpeza automática de arquivos temporários (LGPD)
+│   ├── gtk_silencer.py        # Silencia avisos do GTK antes do WeasyPrint
+│   ├── media_service.py       # Leitura de links
+│   └── pdf_service.py         # Montagem do HTML e geração do PDF
+├── static/
+│   ├── index.html             # Interface
+│   ├── css/style.css          # Estilos e tema claro/escuro
+│   └── js/app.js              # Lógica da interface
+├── mocks/                     # Payloads de exemplo usados nos testes
+├── tests/                     # Testes automatizados
+├── pytest.ini
+├── requirements.txt
+└── requirements-dev.txt
+```
+
+### Instalação
+
+1. Pré-requisitos: Python 3.13 e as bibliotecas do sistema exigidas pelo WeasyPrint (no Windows, o GTK). Consulte a documentação oficial do WeasyPrint para o seu sistema.
+2. Clone o repositório e entre na pasta:
+
+   ```bash
+   git clone <url-do-repositorio>
+   cd ScriptaAI
+   ```
+
+3. Crie e ative o ambiente virtual:
+
+   ```bash
+   python -m venv .venv
+   ```
+
+   - Windows: `.venv\Scripts\activate`
+   - Linux/macOS: `source .venv/bin/activate`
+
+4. Instale as dependências e inicie o servidor:
+
+   ```bash
+   pip install -r requirements.txt
+   uvicorn main:app --reload
+   ```
+
+5. Abra `http://127.0.0.1:8000` no navegador.
+
+### Variáveis de ambiente (opcionais)
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `STORAGE_ROOT` | `storage` | Pasta dos arquivos enviados e dos PDFs gerados |
+| `MAX_UPLOAD_MB` | `25` | Tamanho máximo, em MB, de cada arquivo enviado |
+| `ALLOWED_ORIGINS` | `http://127.0.0.1:8000,http://localhost:8000` | Origens permitidas pelo CORS, separadas por vírgula |
+
+### Endpoints da API
+
+A documentação interativa fica em `http://127.0.0.1:8000/docs`.
+
+| Método | Rota | Descrição | Sucesso |
+|---|---|---|---|
+| GET | `/api/health` | Verifica se a aplicação está no ar | 200 |
+| POST | `/api/upload` | Envia um ou mais arquivos (campo `files`) | 200 |
+| POST | `/api/generate-preview` | Gera o HTML da pré-visualização | 200 |
+| POST | `/api/export-pdf` | Gera e devolve o PDF do documento | 200 |
+| POST | `/api/documents` | Salva o documento no banco | 201 |
+| GET | `/api/documents` | Lista os documentos salvos, do mais recente ao mais antigo | 200 |
+| GET | `/api/documents/{document_id}` | Retorna um documento salvo com capa e texto completos | 200 |
+
+Os erros seguem o formato `{"ok": false, "error": "mensagem"}`:
+
+| Código | Quando acontece |
+|---|---|
+| 404 | Documento não encontrado |
+| 413 | Arquivo maior que o limite de `MAX_UPLOAD_MB` |
+| 415 | Extensão de arquivo não permitida |
+| 422 | Dados do payload inválidos |
+| 500 | Falha interna, como erro na geração do PDF |
+
+### Banco de dados
+
+O banco é um arquivo SQLite (`scriptaai.db`), criado automaticamente na primeira execução.
+
+| Tabela | Modelo | Finalidade |
+|---|---|---|
+| `documents` | `Document` | Título, norma, fonte, tamanho, margem, capa (JSON), fórmula, texto e datas |
+| `source_files` | `SourceFile` | Arquivos de apoio vinculados a um documento |
+| `document_images` | `DocumentImage` | Imagens vinculadas a um documento |
+| `export_records` | `ExportRecord` | Registro dos arquivos exportados |
+
+A API grava e lê apenas a tabela `documents`. As demais tabelas já existem, mas ainda não são preenchidas pela aplicação.
+
+### Testes automatizados
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+A suíte em `tests/` cobre a rota de verificação, o upload (envio válido, extensão recusada e falta de arquivo), a pré-visualização em diferentes cenários (com links simulados) e a geração do PDF, incluindo falha simulada no motor. Os testes usam pastas temporárias e não alteram o `storage` real.
+
+### Privacidade e LGPD
+
+- **Limpeza automática:** uma tarefa em segundo plano, iniciada com a aplicação, remove arquivos temporários. A regra está em `services/cleanup_service.py`. Prazo: `<preencher após conferir o cleanup_service.py>`.
+- **Arquivos enviados:** ficam em `storage/uploads`.
+- **PDFs gerados:** ficam em `storage/output`.
+- **Documentos salvos:** ficam no banco até serem excluídos. A interface ainda não tem função para excluir documentos.
+- **Política de privacidade:** a versão atual é preliminar e precisa de revisão jurídica antes da publicação.
+
+### Limitações conhecidas
+
+- Links e arquivos enviados não são salvos com o documento e, por isso, não voltam ao reabrir.
+- A geração de texto por IA ainda não está implementada. O conteúdo vem do que o usuário escreve.
+- A exportação para Word gera um arquivo `.doc`, e não um `.docx`.
+- Ainda não há rota para excluir documentos salvos.
+
+### Licença
+
+Projeto sob a licença MIT. Veja o arquivo `LICENSE`.

@@ -14,6 +14,7 @@ from services.gtk_silencer import suppress_glib_warnings
 suppress_glib_warnings()
 
 # 2. Importações
+import json
 import os
 import uuid
 import asyncio
@@ -31,7 +32,7 @@ from services import media_service, pdf_service
 from services.cleanup_service import cleanup_temporary_files_task
 from database import engine, Base, get_db
 from models.document import Document
-from schemas.document import GenerateIn, DocumentOut, UploadOut, PreviewOut
+from schemas.document import GenerateIn, DocumentOut, DocumentDetailOut, UploadOut, PreviewOut
 
 # ---------------------------------------------------------------------------
 # Caminhos e configuração
@@ -266,6 +267,37 @@ def list_documents(db: Session = Depends(get_db)):
         )
         for d in docs
     ]
+
+
+@app.get("/api/documents/{document_id}", response_model=DocumentDetailOut)
+def get_document(document_id: str, db: Session = Depends(get_db)):
+    """Retorna um documento salvo com capa e texto completos."""
+    doc = db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Documento não encontrado.")
+
+    # A capa é guardada como texto JSON; se estiver vazia ou corrompida, volta como None
+    cover = None
+    if doc.cover_json:
+        try:
+            parsed = json.loads(doc.cover_json)
+            cover = parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            cover = None
+
+    return DocumentDetailOut(
+        id=doc.id,
+        title=doc.title,
+        norm=doc.norm,
+        font_family=doc.font_family,
+        font_size=doc.font_size,
+        margin_density=doc.margin_density,
+        cover=cover,
+        formula=doc.formula or "",
+        content=doc.content_md or "",
+        created_at=doc.created_at.isoformat(),
+        updated_at=doc.updated_at.isoformat() if doc.updated_at else None,
+    )
 
 
 # ---------------------------------------------------------------------------

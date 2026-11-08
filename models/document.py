@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from database import Base
 
 
@@ -18,7 +20,11 @@ class Document(Base):
     formula = Column(Text, nullable=True)
     content_md = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     source_files = relationship("SourceFile", back_populates="document", cascade="all, delete-orphan")
     images = relationship("DocumentImage", back_populates="document", cascade="all, delete-orphan")
