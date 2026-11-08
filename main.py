@@ -1,8 +1,9 @@
 """
-ScriptaAI — Backend FastAPI (Etapa 2).
+ScriptaAI — Backend FastAPI (Etapa 3 - Banco de Dados & LGPD).
 - Serve a interface em static/ (rota "/" e arquivos css/ e js/)
-- Endpoints: /api/health, /api/upload, /api/generate-preview, /api/export-pdf
+- Endpoints: /api/health, /api/upload, /api/generate-preview, /api/export-pdf, /api/documents
 - Storage com UUID em storage/uploads e storage/output
+- Persistência com SQLAlchemy e SQLite + Tarefa de Auto-limpeza LGPD
 """
 
 from __future__ import annotations
@@ -12,19 +13,25 @@ from services.gtk_silencer import suppress_glib_warnings
 
 suppress_glib_warnings()
 
-# 2. Importações normais
+# 2. Importações
 import os
 import uuid
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Depends, status as http_status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from services import media_service, pdf_service
+from services.cleanup_service import cleanup_temporary_files_task
+from database import engine, Base, get_db
+from models.document import Document
+from schemas.document import GenerateIn, DocumentOut, UploadOut, PreviewOut
 
 # ---------------------------------------------------------------------------
 # Caminhos e configuração
@@ -50,11 +57,26 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+# Inicialização das tabelas no Banco de Dados
+Base.metadata.create_all(bind=engine)
+
+# ---------------------------------------------------------------------------
+# Lifespan (Substituto moderno para @app.on_event)
+# ---------------------------------------------------------------------------
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Gerencia o ciclo de vida da aplicação e tarefas em background (LGPD)."""
+    task = asyncio.create_task(cleanup_temporary_files_task())
+    yield
+    task.cancel()
+
+
 # ---------------------------------------------------------------------------
 # Aplicação
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="ScriptaAI", version="0.2.0")
+app = FastAPI(title="ScriptaAI", version="0.3.0", lifespan=lifespan)
 
 # noinspection PyTypeChecker,PyArgumentList
 app.add_middleware(
@@ -76,51 +98,11 @@ async def disable_frontend_cache(request: Request, call_next):
 
 
 # ---------------------------------------------------------------------------
-# Schemas Pydantic (contrato com o app.js)
-# ---------------------------------------------------------------------------
-
-class CoverIn(BaseModel):
-    title: str = ""
-    subtitle: str = ""
-    author: str = ""
-    institution: str = ""
-
-
-class ImageIn(BaseModel):
-    url: str = ""
-    caption: str = ""
-
-
-class GenerateIn(BaseModel):
-    prompt: str = ""
-    content: str = ""
-    links: list[str] = Field(default_factory=list)
-    norm: str = "abnt"
-    font_family: str = "arial"
-    font_size: int = 12
-    margin_density: str = "normal"
-    cover: CoverIn = Field(default_factory=CoverIn)
-    image_size: int = 100
-    image_layout: str = "below"
-    formula: str = ""
-    images: list[ImageIn] = Field(default_factory=list)
-
-
-class PreviewOut(BaseModel):
-    html: str
-    used_links: int = 0
-
-
-class UploadOut(BaseModel):
-    uploads: list[dict]
-
-
-# ---------------------------------------------------------------------------
 # Utilitários
 # ---------------------------------------------------------------------------
 
-def _error_response(status: int, message: str) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"ok": False, "error": message})
+def _error_response(status_code: int, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"ok": False, "error": message})
 
 
 def _new_id() -> str:
@@ -158,7 +140,7 @@ def index() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "app": "ScriptaAI", "version": "0.2.0"}
+    return {"ok": True, "app": "ScriptaAI", "version": "0.3.0"}
 
 
 @app.post("/api/upload", response_model=UploadOut)
@@ -233,6 +215,57 @@ async def export_pdf(payload: GenerateIn) -> FileResponse:
         media_type="application/pdf",
         filename=f"scriptaai_{file_id}.pdf",
     )
+
+
+@app.post("/api/documents", response_model=DocumentOut, status_code=http_status.HTTP_201_CREATED)
+def create_document(payload: GenerateIn, db: Session = Depends(get_db)):
+    """Salva um novo documento no banco de dados baseado no payload."""
+    cover_data = payload.cover
+    title = cover_data.title if cover_data and cover_data.title else "Documento sem Título"
+
+    cover_json_str = cover_data.model_dump_json() if cover_data else None
+
+    new_doc = Document(
+        title=title,
+        norm=payload.norm,
+        font_family=payload.font_family,
+        font_size=payload.font_size,
+        margin_density=payload.margin_density,
+        cover_json=cover_json_str if cover_json_str else "",
+        formula=payload.formula or "",
+        content_md=payload.content or ""
+    )
+    db.add(new_doc)
+    db.commit()
+    db.refresh(new_doc)
+
+    return DocumentOut(
+        id=new_doc.id,
+        title=new_doc.title,
+        norm=new_doc.norm,
+        font_family=new_doc.font_family,
+        font_size=new_doc.font_size,
+        margin_density=new_doc.margin_density,
+        created_at=new_doc.created_at.isoformat()
+    )
+
+
+@app.get("/api/documents", response_model=list[DocumentOut])
+def list_documents(db: Session = Depends(get_db)):
+    """Lista todos os documentos salvos no histórico."""
+    docs = db.query(Document).order_by(Document.created_at.desc()).all()
+    return [
+        DocumentOut(
+            id=d.id,
+            title=d.title,
+            norm=d.norm,
+            font_family=d.font_family,
+            font_size=d.font_size,
+            margin_density=d.margin_density,
+            created_at=d.created_at.isoformat()
+        )
+        for d in docs
+    ]
 
 
 # ---------------------------------------------------------------------------
