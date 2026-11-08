@@ -1,0 +1,19 @@
+{
+  "prompt": "",
+  "content": "# Título de teste\n\nParágrafo de teste.",
+  "links": [],
+  "norm": "abnt",
+  "font_family": "arial",
+  "font_size": 12,
+  "margin_density": "normal",
+  "cover": {
+    "title": "",
+    "subtitle": "",
+    "author": "",
+    "institution": ""
+  },
+  "image_size": 100,
+  "image_layout": "below",
+  "formula": "",
+  "images": []
+}

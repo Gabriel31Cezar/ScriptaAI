@@ -1,0 +1,19 @@
+{
+  "prompt": "",
+  "content": "# Conteúdo\n\nTexto após a capa.",
+  "links": [],
+  "norm": "abnt",
+  "font_family": "times",
+  "font_size": 12,
+  "margin_density": "normal",
+  "cover": {
+    "title": "Título Principal",
+    "subtitle": "Subtítulo Secundário",
+    "author": "João Pereira",
+    "institution": "Universidade Exemplo"
+  },
+  "image_size": 100,
+  "image_layout": "below",
+  "formula": "",
+  "images": []
+}

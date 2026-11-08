@@ -1,0 +1,28 @@
+{
+  "prompt": "",
+  "content": "# Introdução\n\nEste é o conteúdo principal do documento. Ele contém **negrito**, *itálico* e uma lista:\n\n- Primeiro item\n- Segundo item\n- Terceiro item\n\n## Seção 2\n\nMais conteúdo aqui.",
+  "links": [],
+  "norm": "executivo",
+  "font_family": "times",
+  "font_size": 11,
+  "margin_density": "wide",
+  "cover": {
+    "title": "Relatório Anual",
+    "subtitle": "Análise de Desempenho 2026",
+    "author": "Maria Silva",
+    "institution": "ScriptaAI Corp"
+  },
+  "image_size": 60,
+  "image_layout": "side",
+  "formula": "E = mc^2",
+  "images": [
+    {
+      "url": "/storage/uploads/aaaa1111_foto1.png",
+      "caption": "Figura 1 — Primeira imagem"
+    },
+    {
+      "url": "/storage/uploads/bbbb2222_foto2.png",
+      "caption": "Figura 2 — Segunda imagem"
+    }
+  ]
+}

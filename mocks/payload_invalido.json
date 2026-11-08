@@ -1,0 +1,19 @@
+{
+  "prompt": "",
+  "content": "teste",
+  "links": "não é uma lista",
+  "norm": "inexistente",
+  "font_family": "arial",
+  "font_size": "doze",
+  "margin_density": "normal",
+  "cover": {
+    "title": "",
+    "subtitle": "",
+    "author": "",
+    "institution": ""
+  },
+  "image_size": 999,
+  "image_layout": "below",
+  "formula": "",
+  "images": []
+}

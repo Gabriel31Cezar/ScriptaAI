@@ -1,0 +1,1 @@
+# Marca a pasta tests como um pacote Python.

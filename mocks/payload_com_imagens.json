@@ -1,0 +1,24 @@
+{
+  "prompt": "",
+  "content": "Documento com imagens.",
+  "links": [],
+  "norm": "apa-ieee",
+  "font_family": "arial",
+  "font_size": 12,
+  "margin_density": "narrow",
+  "cover": {
+    "title": "",
+    "subtitle": "",
+    "author": "",
+    "institution": ""
+  },
+  "image_size": 30,
+  "image_layout": "center",
+  "formula": "",
+  "images": [
+    {
+      "url": "/storage/uploads/cccc3333_logo.png",
+      "caption": "Logo"
+    }
+  ]
+}
