@@ -180,16 +180,9 @@ async def upload(files: list[UploadFile] = File(...)) -> UploadOut:
 async def generate_preview(payload: GenerateIn) -> PreviewOut:
     data = payload.model_dump()
 
-    # Se o usuário enviou um prompt de IA, geramos o texto automaticamente
-    generated_content = data.get("content") or ""
-    if data.get("prompt") and not generated_content.strip():
-        try:
-            generated_content = generate_text_with_gemini(data.get("prompt") or "")
-        except Exception as e:
-            generated_content = f"[Erro ao gerar texto com IA: {str(e)}]"
-        data["content"] = generated_content
+    prompt_text = (data.get("prompt") or "").strip()
 
-    # Processamento de links com log
+    # 1. Processa os links para extrair estritamente o texto útil, isolando ruídos
     scraped = await media_service.scrape_many(data.get("links") or [])
     extra_parts = []
     for item in scraped:
@@ -199,12 +192,35 @@ async def generate_preview(payload: GenerateIn) -> PreviewOut:
             print(f"[AVISO] Link falhou ou não retornou texto: {item.get('url')}")
 
     used_links = len(extra_parts)
-    print(f"[INFO] Preview gerado. Links usados: {used_links}")
+    context_material = "\n\n".join(extra_parts).strip()
 
-    if extra_parts:
-        base = (data.get("content") or "").strip()
-        joined = "\n\n".join(extra_parts)
-        data["content"] = f"{base}\n\n{joined}".strip() if base else joined
+    # 2. Isola o Prompt como comando/instrução e os links como material de apoio estrito
+    ai_instruction = prompt_text if prompt_text else "Gere um documento estruturado com base nas referências fornecidas."
+
+    if context_material:
+        full_ai_prompt = (
+            f"[INSTRUÇÃO DO USUÁRIO / COMANDO]\n{ai_instruction}\n\n"
+            f"[MATERIAL DE REFERÊNCIA E CONTEXTO EXTERNO]\n"
+            f"Utilize exclusivamente o texto abaixo como base de dados para redigir o documento final. "
+            f"Ignore qualquer elemento de navegação ou poluição eletrônica da página web:\n"
+            f"--------------------------------------------------\n"
+            f"{context_material}\n"
+            f"--------------------------------------------------"
+        )
+    else:
+        full_ai_prompt = (
+            f"[INSTRUÇÃO DO USUÁRIO / COMANDO]\n{ai_instruction}\n\n"
+            f"Escreva o texto completo e estruturado para o documento correspondente."
+        )
+
+    # 3. Executa a chamada ao Gemini com o prompt separado do conteúdo bruto
+    try:
+        generated_content = generate_text_with_gemini(full_ai_prompt)
+    except Exception as e:
+        generated_content = f"[Erro ao gerar texto com IA: {str(e)}]"
+
+    data["content"] = generated_content
+    print(f"[INFO] Preview gerado. Links usados como contexto: {used_links}")
 
     html = pdf_service.build_html(data)
     return PreviewOut(html=html, used_links=used_links)
@@ -213,6 +229,26 @@ async def generate_preview(payload: GenerateIn) -> PreviewOut:
 @app.post("/api/export-pdf")
 async def export_pdf(payload: GenerateIn) -> FileResponse:
     data = payload.model_dump()
+
+    # Aplica a mesma estrutura de isolamento entre comando (prompt) e contexto (links) no PDF
+    prompt_text = (data.get("prompt") or "").strip()
+    if prompt_text and not (data.get("content") and data.get("content") != prompt_text):
+        scraped = await media_service.scrape_many(data.get("links") or [])
+        context_material = "\n\n".join([item["text"] for item in scraped if item.get("text")]).strip()
+
+        if context_material:
+            full_ai_prompt = (
+                f"[INSTRUÇÃO DO USUÁRIO / COMANDO]\n{prompt_text}\n\n"
+                f"[MATERIAL DE REFERÊNCIA E CONTEXTO EXTERNO]\n{context_material}"
+            )
+        else:
+            full_ai_prompt = prompt_text
+
+        try:
+            data["content"] = generate_text_with_gemini(full_ai_prompt)
+        except Exception as exc:
+            print(f"[AVISO] Falha ao gerar IA no PDF: {exc}")
+
     file_id = _new_id()
     out_path = OUTPUT_DIR / f"{file_id}.pdf"
 

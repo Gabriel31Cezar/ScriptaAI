@@ -138,6 +138,25 @@ Esta seção descreve a versão final do projeto, incluindo a interface de persi
 - Salvar documentos, listar os salvos e reabri-los pela lista.
 - Tema claro e escuro, com layout responsivo.
 
+## Integração com Inteligência Artificial (Etapa 6)
+
+O ScriptaAI foi expandido para contar com motor de geração de conteúdo inteligente através da integração oficial com a API do Google Gemini, permitindo a criação autônoma de artigos, resumos e textos técnicos diretamente no backend.
+
+### Arquitetura da IA (`services/ai_service.py`)
+- **SDK Oficial:** Utiliza a biblioteca moderna `google-genai` do Google para gerenciar de forma nativa e segura a autenticação e as requisições de modelos de linguagem.
+- **Modelo Utilizado:** Padronizado com o modelo de alta performance **`gemini-3.8-flash`**, garantindo respostas rápidas, alta precisão contextual e total estabilidade de rota no backend FastAPI.
+- **Tratamento de Erros:** Validação prévia de variáveis de ambiente e captura estruturada de exceções de API (`errors.APIError`) para evitar quedas no servidor.
+
+### Configuração de Ambiente
+- **Credenciais Seguras:** A chave de acesso é obtida via variável de ambiente `GEMINI_API_KEY` carregada de forma isolada através do arquivo `.env` com o auxílio do pacote `python-dotenv`.
+- **Dependências:** O pacote oficial `google-genai` foi integrado ao projeto e versionado no arquivo de dependências (`requirements.txt`).
+
+### Fluxo de Funcionamento
+1. O usuário submete um prompt descritivo na interface web do ScriptaAI.
+2. O FastAPI recebe os parâmetros e aciona o serviço `generate_text_with_gemini`.
+3. O SDK oficial comunica-se com a nuvem do Google usando o modelo `gemini-3.8-flash`.
+4. O texto gerado é retornado, processado e injetado dinamicamente na folha A4 de pré-visualização para exportação ou refinamento.
+
 ### Tecnologias
 
 - Python 3.13, FastAPI e Pydantic v2

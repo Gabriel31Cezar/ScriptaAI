@@ -1,63 +1,45 @@
 """
-Serviço de integração com a API do Google Gemini via requisições HTTP (requests).
+Serviço de integração oficial com a API do Google Gemini usando o SDK oficial (google-genai).
 """
 
 from __future__ import annotations
 
 import os
-import requests
+from google import genai
+from google.genai import errors
+from dotenv import load_dotenv
 
-# Modelo padrão recomendado para texto rápido e eficiente
-_GEMINI_MODEL = "gemini-1.5-flash"
-_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{_GEMINI_MODEL}:generateContent"
+load_dotenv()
+
+# Utilizando o modelo atualizado exigido pela API do Google
+_GEMINI_MODEL = "gemini-3.8-flash"
 
 
 def generate_text_with_gemini(prompt: str) -> str:
-    """Envia um prompt para a API do Gemini e retorna o texto gerado."""
+    """Envia um prompt para a API do Gemini utilizando o SDK oficial."""
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         raise ValueError("Chave GEMINI_API_KEY não configurada nas variáveis de ambiente.")
 
-    headers = {
-        "Content-Type": "application/json",
-    }
+    if not prompt or not prompt.strip():
+        raise ValueError("O prompt fornecido está vazio.")
 
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt}
-                ]
-            }
-        ]
-    }
+    client = genai.Client(api_key=api_key)
 
     try:
-        response = requests.post(
-            f"{_API_URL}?key={api_key}",
-            json=payload,
-            headers=headers,
-            timeout=30
+        response = client.models.generate_content(
+            model=_GEMINI_MODEL,
+            contents=prompt,
         )
-        response.raise_for_status()
-        data = response.json()
 
-        # Extração segura da resposta da estrutura do Gemini
-        candidates = data.get("candidates", [])
-        if not candidates:
-            return "[Erro: Nenhum conteúdo retornado pela IA]"
+        if response and response.text:
+            return str(response.text).strip()
 
-        content = candidates[0].get("content", {})
-        parts = content.get("parts", [])
-        if not parts:
-            return "[Erro: Estrutura de resposta inválida da IA]"
+        return "[Erro: Nenhum conteúdo retornado pela IA]"
 
-        text_result = parts[0].get("text", "")
-        return text_result.strip()
-
-    except requests.exceptions.RequestException as e:
-        print(f"[ERRO GEMINI API] Falha de comunicação: {e}")
+    except errors.APIError as e:
+        print(f"[ERRO GEMINI API SDK] Erro na API do Google: {e}")
+        raise RuntimeError(f"Erro na API do Gemini: {e}") from e
+    except Exception as e:
+        print(f"[ERRO INESPERADO] Falha ao comunicar com o Gemini: {e}")
         raise RuntimeError(f"Falha de comunicação com a API do Gemini: {e}") from e
-    except (KeyError, IndexError, ValueError) as e:
-        print(f"[ERRO GEMINI API] Falha ao processar resposta: {e}")
-        raise RuntimeError("Formato de resposta inesperado da API do Gemini.") from e

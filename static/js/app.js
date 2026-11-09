@@ -687,6 +687,12 @@
         setValue("#cover-author", cover.author || "");
         setValue("#cover-institution", cover.institution || "");
 
+        // Se houver título de capa no documento carregado, abre a seção de dados da capa para facilidade
+        const coverDetails = $(".cover-details");
+        if (coverDetails && (cover.title || cover.author)) {
+            coverDetails.open = true;
+        }
+
         setValue("#formula-input", doc.formula || "");
 
         state.uploadedFiles = [];
