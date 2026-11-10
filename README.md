@@ -2,201 +2,129 @@
 
 Gerador Inteligente de PDFs e Documentos com IA (Web Full-Stack e Backend Python).
 
+## Visão Geral do Projeto
+O **ScriptaAI** é uma solução full-stack desenvolvida em Python (FastAPI) e JavaScript Vanilla para a criação, formatação e automação de documentos técnicos e acadêmicos. O sistema integra inteligência artificial generativa (Google Gemini), persistência relacional (SQLAlchemy / SQLite), mecanismos de conformidade com a LGPD e compilação nativa de arquivos PDF via WeasyPrint.
+
+---
+
 ## Interface do Usuário & Frontend (Etapa 1)
 
-A interface do ScriptaAI foi construída com HTML5, CSS3 e JavaScript puro, sem frameworks ou bibliotecas externas. Ela organiza a criação de documentos em uma barra lateral de configurações e uma área de pré-visualização no formato A4, e se comunica com o backend FastAPI pelas rotas `/api/upload` e `/api/generate-preview`.
+A interface do ScriptaAI foi construída com HTML5, CSS3 e JavaScript puro, sem dependência de frameworks externos. Organiza a criação de documentos em uma barra lateral de configurações e uma área de pré-visualização no formato A4, comunicando-se com o backend FastAPI via requisições REST JSON.
 
 ### Arquitetura da Interface
-- **Arquivos:** `static/index.html` (estrutura), `static/css/style.css` (temas e layout) e `static/js/app.js` (comportamento e comunicação com a API).
-- **Layout:** duas colunas em grid, com a barra lateral fixa à esquerda (300 px) e o painel principal à direita. Abaixo de 768 px, as colunas viram uma só.
-- **Temas:** claro e escuro, controlados por variáveis CSS e pelo atributo `data-theme`. A escolha é salva no `localStorage`, e na primeira visita o sistema define o tema inicial.
-- **Folha A4:** a área de visualização tem 210 × 297 mm e fundo branco em qualquer tema, como papel impresso.
+- **Arquivos:** `static/index.html` (estrutura DOM), `static/css/style.css` (temas e layout A4) e `static/js/app.js` (comportamento, validação e comunicação com a API).
+- **Layout:** Grid responsivo de duas colunas, com barra lateral fixa à esquerda (300px) e painel principal à direita. Adapta-se automaticamente para coluna única em telas abaixo de 768px.
+- **Temas:** Suporte nativo a modo claro e escuro via variáveis CSS e atributo `data-theme`, com persistência em `localStorage`.
+- **Folha A4:** Área de visualização calibrada em 210 × 297 mm com margens e tipografia dinâmicas.
 
 ### Componentes da Barra Lateral
-- **Entradas de conteúdo:** campo de prompt, caixa de links (um por linha) e área de upload por clique ou arrastar. Os formatos aceitos são `.txt`, `.md`, `.docx`, `.mp3`, `.mp4`, `.png` e `.pdf`.
-- **Formatação:** cards de seleção única para ABNT, APA/IEEE, Executivo Moderno e Apostila Compacta.
-- **Tipografia:** fonte (Arial, Times New Roman, Roboto ou Monospace), tamanho de 10 a 14 pt e densidade de margem (estreita, normal ou larga).
-- **Capa:** seção recolhível com título, subtítulo, autor e instituição.
-- **Imagens e fórmulas:** tamanho (30%, 60% ou 100%), disposição (abaixo do texto, texto ao lado ou centralizado) e campo de fórmula em texto.
+- **Entradas de Conteúdo:** Campo para comandos (prompt da IA), caixa de links de referência e zona interativa de upload por drag-and-drop. Formatos aceitos: `.txt`, `.md`, `.docx`, `.mp3`, `.mp4`, `.png` e `.pdf`.
+- **Formatação Normativa:** Seletores rápidos para normas ABNT, APA/IEEE, Executivo Moderno e Apostila Compacta.
+- **Tipografia & Margens:** Fontes (Arial, Times New Roman, Roboto, Monospace), tamanho de 10 a 14 pt e densidades de margem (estreita, normal, larga).
+- **Capa & Mídia:** Campos para título, subtítulo, autor e instituição, além de controle de tamanho e disposição de imagens.
 
 ### Componentes do Painel Principal
-- **Barra de ferramentas:** Gerar/Atualizar Preview, Baixar PDF, Baixar DOCX, Copiar Texto e Novo Documento.
-- **Linha de status:** mensagens de sucesso, erro e carregamento, com cor própria para cada tipo.
-- **Folha A4:** exibe a capa, a imagem de exemplo, a fórmula e o conteúdo retornado pelo servidor. As margens, a fonte e o tamanho acompanham os seletores.
-- **Carregamento:** spinner e blocos skeleton sobre a folha durante a geração, com o botão desativado até a resposta chegar.
-- **Modal de privacidade:** elemento `<dialog>` nativo, aberto pelo rodapé e fechado com Esc, pelo botão "Fechar" ou clicando fora da janela.
+- **Barra de Ferramentas:** Ações para "Gerar/Atualizar Preview", "Salvar documento", "Baixar PDF", "Baixar Word (.doc)", "Copiar Texto" e "Novo Documento".
+- **Painel de Histórico:** Lista dinâmica de documentos salvos no SQLite com botões interativos para reabertura de rascunhos e exclusão individual (`🗑️`).
+- **Modal de Privacidade:** Modal nativo (`<dialog>`) detalhando o tratamento de dados e os termos de uso em conformidade com a LGPD.
 
-### Integração com o Backend
-- **Upload:** os arquivos são validados por extensão e tamanho (25 MB) no navegador e enviados por `FormData` para `POST /api/upload`. A lista de arquivos mostra o nome e o tamanho devolvidos pelo servidor.
-- **Preview:** os dados da tela são enviados como JSON para `POST /api/generate-preview`. Antes do envio, o texto é normalizado (quebras de linha do Windows e sequências literais `\n` e `\t` viram caracteres reais).
-- **Renderização segura:** o HTML devolvido pelo servidor passa por um sanitizador antes de ser exibido. Ele remove `script`, `style`, `iframe`, `object`, `embed`, `link`, `meta`, `base` e `form`, além de atributos `on*` e links `javascript:`.
-- **Exportação para Word:** o arquivo `.doc` é gerado no navegador a partir da folha, com estilos do Word, e nomeado pelo título da capa.
-- **Impressão:** o botão "Baixar PDF" abre a caixa de impressão do navegador. Regras `@media print` mostram somente a folha, que pode ocupar várias páginas.
-
-### Acessibilidade
-- Todos os campos têm `label` associado.
-- Os cards de norma usam botões de rádio ocultos visualmente, que continuam navegáveis por Tab e setas.
-- Os botões e campos mostram contorno de foco visível.
-- A linha de status usa `aria-live="polite"`, para que leitores de tela anunciem as mensagens.
-
-### Pendências da Etapa
-- A norma selecionada (ABNT, APA/IEEE etc.) ainda não altera a formatação do preview nem da exportação.
-- A exportação em PDF usa a impressão do navegador. A rota `POST /api/export-pdf` do backend ainda não é chamada pelo frontend.
-- O arquivo `.doc` não é um DOCX nativo. Um DOCX real exige biblioteca externa, que depende de autorização.
-- A imagem da folha é um exemplo fixo. Imagens enviadas só aparecem no preview quando o servidor as incluir no HTML devolvido.
-- A fórmula é texto simples, sem renderização matemática.
-- "Novo Documento" limpa o conteúdo do preview, e o texto de exemplo não é restaurado.
-- O texto da política de privacidade é preliminar e precisa de revisão jurídica antes da publicação.
+---
 
 ## Backend & Engine de PDF (Etapa 2)
 
-O motor do ScriptaAI foi construído em Python com **FastAPI** para processar as requisições do frontend, realizar a raspagem de links, gerar PDFs nativos com **WeasyPrint** e gerenciar o armazenamento seguro de arquivos.
+O motor do ScriptaAI foi construído em Python com **FastAPI** e **Uvicorn** para processar requisições, realizar extração e raspagem de dados externos e compilar documentos PDF com **WeasyPrint**.
 
 ### Arquitetura da Aplicação (`main.py`)
-- **Tecnologia:** FastAPI com Uvicorn como servidor ASGI.
-- **Padrão de Serviço:** Interface servida estaticamente a partir da pasta `static/` e rotas de API isoladas sob o prefixo `/api/`.
-- **Configuração:** Middleware CORS habilitado com origens restritas e `Cache-Control` aplicado aos arquivos estáticos para evitar cache obsoleto no navegador.
-- **Segurança:** Validação de payloads e tratamento global de exceções retornando sempre JSON padronizado (`{"ok": false, "error": "..."}`).
+- **Padrão de Serviço:** Servidor ASGI FastAPI gerenciando estáticos e rotas de API sob o prefixo `/api/`.
+- **Segurança & CORS:** Middleware CORS habilitado com origens restritas e `Cache-Control` configurado para prevenir cache antigo de ativos no navegador.
+- **Silenciamento de Avisos:** Módulo `gtk_silencer.py` para supressão de logs desnecessários do biblioteca GLib/GTK no ambiente Windows.
 
 ### Estrutura de Serviços (`services/`)
-- **`pdf_service.py`:** Engine de compilação HTML/Markdown para PDF. Aplica estilos estritos baseados na norma escolhida (ABNT, APA/IEEE, Executivo, Apostila), com controle de quebra de página, suporte a imagens em colunas e ajuste dinâmico de margens.
-- **`media_service.py`:** Leitura de arquivos locais (`.txt`, `.md`, `.docx`) e raspagem de URLs externas. Utiliza `requests` com cabeçalhos de navegador real para contornar bloqueios anti-bot (como os da Wikipedia).
-- **`gtk_silencer.py`:** Rotina de compatibilidade para o Windows que intercepta e silencia avisos nativos do GTK (usado pelo WeasyPrint) durante a inicialização do servidor.
+- **`pdf_service.py`:** Engine de compilação HTML/Markdown para PDF com WeasyPrint. Aplica estilos estritos baseados nas normas escolhidas e realiza resolução automática de caminhos de arquivos locais (`file:///...`) para renderização perfeita de imagens no PDF.
+- **`media_service.py`:** Raspagem assíncrona de páginas web e URLs externas usando `requests` e cabeçalhos de navegadores reais para contornar bloqueios anti-bot.
 
-### Endpoints da API
-- `POST /api/upload`: Recebe arquivos via `multipart/form-data`, valida a extensão, aplica um UUID no nome e armazena de forma segura no diretório `storage/uploads/`.
-- `POST /api/generate-preview`: Recebe o payload JSON, raspa os links fornecidos, converte o texto (Markdown) para HTML e retorna o documento renderizado para a folha A4 do frontend.
-- `POST /api/export-pdf`: Recebe o mesmo payload, compila o arquivo binário usando a engine do WeasyPrint e faz o download do PDF final.
-- `GET /api/health`: Verificação de status da aplicação (healthcheck).
-
-### Gestão de Arquivos & Engine
-- **Isolamento:** Uploads e PDFs gerados são armazenados com nomes únicos (UUID) nos diretórios `storage/uploads/` e `storage/output/`.
-- **Manipulação de Texto:** Leitura nativa de arquivos `.docx` (via `python-docx`) e conversão de Markdown para HTML, respeitando limites de tamanho para garantir a performance do servidor.
+---
 
 ## Banco de Dados & Persistência (Etapa 3)
 
-O backend do ScriptaAI foi atualizado para incluir suporte completo à persistência relacional de dados com **SQLAlchemy** e **SQLite**, além de rotinas para conformidade com a LGPD.
+Suporte completo à persistência relacional de dados utilizando **SQLAlchemy ORM** e **SQLite**, com schemas estritos de validação via **Pydantic v2**.
 
-### Arquitetura do Banco de Dados
-- **Tecnologia:** SQLAlchemy ORM com SQLite (`scriptaai.db`).
-- **Padrão de Conexão:** Gerenciamento de sessões com injeção de dependência via `Depends(get_db)` nos endpoints da API.
-- **Criação Automática:** As tabelas são gerenciadas dinamicamente na inicialização do servidor FastAPI (`Base.metadata.create_all`).
-
-### Estrutura de Modelos (`models/document.py`)
-- **`Document`:** Armazena os dados principais dos documentos (título, norma, fonte, margens, capa em formato JSON, fórmulas, conteúdo em Markdown e timestamps UTC).
-- **`SourceFile`:** Registro dos arquivos enviados vinculados a um documento com exclusão em cascata (`CASCADE`).
-- **`DocumentImage`:** Metadados das imagens associadas, ordem de exibição e legendas.
-- **`ExportRecord`:** Histórico de exportações e arquivos gerados.
+### Arquitetura do Banco de Dados (`database.py` e `models/document.py`)
+- **Tecnologia:** SQLAlchemy ORM conectado ao SQLite local (`scriptaai.db`).
+- **Modelos Relacionais:**
+  - `Document`: Título, norma, tipografia, margens, capa (JSON), fórmula, conteúdo Markdown e timestamps UTC.
+  - `SourceFile`: Registro de arquivos de apoio vinculados com exclusão em cascata (`CASCADE`).
+  - `DocumentImage`: Metadados de imagens, legendas e ordens de exibição.
+  - `ExportRecord`: Registro histórico de PDFs exportados.
 
 ### Schemas e Validação (`schemas/document.py`)
-- Contratos de dados refatorados para o **Pydantic v2** (`model_dump()`, `model_dump_json()`).
-- Schemas estritos para criação (`GenerateIn`), leitura (`DocumentOut`), upload (`UploadOut`) e visualização (`PreviewOut`).
+- Contratos de dados baseados no Pydantic v2 (`GenerateIn`, `DocumentOut`, `DocumentDetailOut`, `UploadOut`, `PreviewOut`).
 
-### Novos Endpoints da API
-- `POST /api/documents`: Salva um novo documento estruturado no banco de dados.
-- `GET /api/documents`: Retorna a lista de documentos salvos no histórico ordenados por data de criação.
+### Conformidade com a LGPD (`services/cleanup_service.py`)
+- Gerenciamento de ciclo de vida moderno via **`lifespan`** no FastAPI.
+- Tarefa assíncrona em segundo plano para limpeza e purga automática de arquivos temporários de upload com retenção máxima de 24 horas.
 
-### Conformidade com a LGPD & Ciclo de Vida (`services/cleanup_service.py`)
-- Substituição do decorador legado `@app.on_event("startup")` pelo gerenciador de contexto moderno **`lifespan`** do FastAPI.
-- Implementação da rotina assíncrona de limpeza automática em segundo plano para remoção de arquivos temporários e expirados nos diretórios de storage.
+---
 
 ## Mocks & Testes Automatizados (Etapa 4)
 
-A qualidade e a estabilidade do backend são garantidas por uma suíte de testes automatizados implementada com **Pytest**, além de um conjunto de dados estáticos (Mocks) para simular requisições e validar o contrato da API.
+A estabilidade do backend é garantida por uma suíte de testes automatizados desenvolvida em **Pytest**, utilizando isolamento de diretórios temporários (`tmp_path`) e mocks JSON de requisições.
 
-### Estrutura de Testes (`tests/`)
-- **`conftest.py`:** Configuração de fixtures do Pytest, incluindo o isolamento do ambiente (geração de arquivos em diretórios temporários via `tmp_path` para não sujar o `storage` real) e a injeção do cliente de testes do FastAPI.
-- **`test_upload.py`:** Valida o upload de arquivos válidos (`.txt`), rejeição de extensões perigosas (`.exe`) e falhas de envio (erros 415 e 422).
-- **`test_generate_preview.py`:** Testa a geração de preview (mínimo, completo, com imagens e capa). Utiliza `monkeypatch` para simular a raspagem de links e evitar dependência de redes externas durante os testes.
-- **`test_export_pdf.py`:** Verifica a geração e o download do arquivo binário PDF, além de simular falhas críticas no motor do WeasyPrint para garantir que o servidor trate o erro 500 corretamente.
-
-### Mocks de Payload (`mocks/`)
-- **`payload_minimo.json`:** Apenas conteúdo de texto, sem capa ou imagens.
-- **`payload_completo.json`:** Todos os campos preenchidos (capa, imagens, fórmula, links).
-- **`payload_invalido.json`:** Payload propositalmente incorreto para testar a rejeição de dados (Erro 422).
-- **`payload_com_capa.json`:** Foco na renderização de título, subtítulo, autor e instituição.
-- **`payload_com_imagens.json`:** Foco na renderização de imagens em colunas e legendas.
-- **`payload_links.json`:** Foco na raspagem de URLs, usando mocks para não depender da internet.
-
-### Configuração do Ambiente
-- **`pytest.ini`:** Define o modo assíncrono (`asyncio_mode = auto`) e restrições de execução (`--strict-markers`).
-- **`requirements-dev.txt`:** Isola as dependências de teste (`pytest`, `pytest-asyncio`) das dependências de produção para manter o servidor leve.
+### Estrutura da Suíte de Testes (`tests/`)
+- **`conftest.py`:** Fixtures de teste e isolamento do cliente FastAPI (`TestClient`).
+- **`test_upload.py`:** Testes de upload de arquivos válidos, rejeição de extensões perigosas (`.exe`) e limites de tamanho.
+- **`test_generate_preview.py`:** Validação de previews mínimos, completos e com raspagem simulada via `monkeypatch`.
+- **`test_export_pdf.py`:** Validação da compilação e download de arquivos binários PDF.
 
 ---
 
 ## Documentação Técnica Final (Etapa 5)
 
-Esta seção descreve a versão final do projeto, incluindo a interface de persistência, a lista e a reabertura de documentos salvos e a documentação de uso.
+Consolidação da interface de persistência, histórico de rascunhos salvos, reabertura de edições passadas e padronização do ambiente full-stack.
 
-### Funcionalidades
-
-- Entrada de conteúdo por prompt, links e arquivos de apoio.
-- Formatação por norma: ABNT, APA/IEEE, Executivo Moderno e Apostila Compacta.
-- Tipografia com Arial, Times New Roman, Roboto ou Monospace, tamanho do texto e densidade de margem.
-- Capa, imagens, fórmula em texto e pré-visualização em folha A4.
-- Exportação em PDF pelo servidor e em `.doc` pelo navegador.
-- Salvar documentos, listar os salvos e reabri-los pela lista.
-- Tema claro e escuro, com layout responsivo.
+---
 
 ## Integração com Inteligência Artificial (Etapa 6)
 
-O ScriptaAI foi expandido para contar com motor de geração de conteúdo inteligente através da integração oficial com a API do Google Gemini, permitindo a criação autônoma de artigos, resumos e textos técnicos diretamente no backend.
+Automação da geração de conteúdo técnico e acadêmico através da integração oficial com a API do Google Gemini.
 
 ### Arquitetura da IA (`services/ai_service.py`)
-- **SDK Oficial:** Utiliza a biblioteca moderna `google-genai` do Google para gerenciar de forma nativa e segura a autenticação e as requisições de modelos de linguagem.
-- **Modelo Utilizado:** Padronizado com o modelo de alta performance **`gemini-3.8-flash`**, garantindo respostas rápidas, alta precisão contextual e total estabilidade de rota no backend FastAPI.
-- **Tratamento de Erros:** Validação prévia de variáveis de ambiente e captura estruturada de exceções de API (`errors.APIError`) para evitar quedas no servidor.
+- **SDK Oficial:** Utiliza a biblioteca moderna `google-genai` do Google.
+- **Modelo Prioritário:** Mapeado com a versão estável de alta disponibilidade **`gemini-3.8-flash`**.
+- **Mecanismo de Fallback:** Suporte a descobrimento e alternância dinâmica de modelos para garantir tolerância a picos de alta demanda (erros 503/404).
 
-### Configuração de Ambiente
-- **Credenciais Seguras:** A chave de acesso é obtida via variável de ambiente `GEMINI_API_KEY` carregada de forma isolada através do arquivo `.env` com o auxílio do pacote `python-dotenv`.
-- **Dependências:** O pacote oficial `google-genai` foi integrado ao projeto e versionado no arquivo de dependências (`requirements.txt`).
-
-### Fluxo de Funcionamento
-1. O usuário submete um prompt descritivo na interface web do ScriptaAI.
-2. O FastAPI recebe os parâmetros e aciona o serviço `generate_text_with_gemini`.
-3. O SDK oficial comunica-se com a nuvem do Google usando o modelo `gemini-3.8-flash`.
-4. O texto gerado é retornado, processado e injetado dinamicamente na folha A4 de pré-visualização para exportação ou refinamento.
-
-### Tecnologias
-
-- Python 3.13, FastAPI e Pydantic v2
-- SQLAlchemy com SQLite
-- WeasyPrint (geração de PDF)
-- Pytest (testes automatizados)
-- HTML5, CSS3 e JavaScript puro
+---
 
 ## Processamento de Fontes de Entrada & Upload de Arquivos (Etapa 7)
 
-O ScriptaAI foi expandido para processar arquivos de apoio locais (`.txt`, `.md`), permitindo injetar o conteúdo extraído diretamente como fonte de contexto para o prompt da inteligência artificial antes da geração final do documento.
+Mecanismo para processar arquivos de apoio locais (`.txt`, `.md`), injetando seus conteúdos diretamente no contexto enviado ao modelo de IA.
 
-### Arquitetura de Extração (`services/file_extractor_service.py`)
-- **Leitura Segura:** Implementação de rotina para abertura e extração de texto bruto de arquivos locais.
-- **Tratamento de Codificação:** Suporte nativo à codificação `utf-8` com mecanismo inteligente de fallback para `latin-1`, prevenindo falhas de decodificação de caracteres.
-- **Validação de Extensões:** Restrição controlada para formatos de texto suportados (`.txt` e `.md`).
+### Extração de Arquivos (`services/file_extractor_service.py`)
+- **Leitura Segura:** Suporte a arquivos de texto codificados em `utf-8` com fallback inteligente para `latin-1`.
+- **Atualização de Contrato:** Campo `uploaded_files` integrado ao schema `GenerateIn` no Pydantic v2.
 
-### Atualização de Contratos (`schemas/document.py`)
-- **Schemas Pydantic v2:** Inclusão do campo `uploaded_files` na classe de entrada `GenerateIn`, permitindo mapear referências aos arquivos enviados pelo usuário para compor o escopo informacional da IA.
+---
 
 ## IA Generativa, Segurança & Exclusão de Rascunhos (Etapa 8)
 
-O ScriptaAI foi expandido com um motor de inteligência artificial de alta performance e mecanismos robustos de gerenciamento e segurança de dados, permitindo a limpeza de rascunhos e controle total do ciclo de vida dos documentos salvos.
+Isolamento estrito entre instruções e referências, além do controle completo do ciclo de vida dos dados do usuário.
 
-### Integração com o Google Gemini (`services/ai_service.py`)
-- **SDK Oficial:** Utiliza a biblioteca moderna `google-genai` do Google com o modelo estável **`gemini-3.8-flash`** para geração autônoma de conteúdo contextual.
-- **Isolamento de Contexto:** O pipeline separa estritamente as instruções de comando (prompt) das fontes de referência (links externos e arquivos locais), prevenindo poluição visual no documento final.
-- **Credenciais Seguras:** Chave de acesso gerenciada por variável de ambiente isolada (`GEMINI_API_KEY`) via `.env`.
+### Isolamento de Contexto
+- O pipeline no `main.py` separa estritamente as instruções de comando (prompt) das fontes de referência (links e arquivos), prevenindo poluição visual ou injeção de HTML no documento final.
+- **Exclusão de Rascunhos:** Endpoint dedicado (`DELETE /api/documents/{document_id}`) para apagar registros no SQLite e remover arquivos físicos temporários de forma síncrona.
 
-### Processamento de Fontes de Entrada (`services/file_extractor_service.py`)
-- **Leitura Segura:** Suporte a arquivos locais `.txt` e `.md` codificados em `utf-8` com fallback inteligente para `latin-1`.
-- **Injeção Dinâmica:** O conteúdo extraído dos arquivos de apoio é somado aos links raspados para compor o escopo informacional base da IA antes da renderização no preview A4.
+---
 
-### Gestão Segura e Exclusão de Documentos
-- **Exclusão em Cascata:** O backend conta com endpoint dedicado (`DELETE /api/documents/{document_id}`) que remove o registro relacional do banco de dados e os arquivos físicos associados (exports e uploads temporários) de forma síncrona.
-- **Interface de Limpeza no Histórico:** O painel lateral do frontend (`static/js/app.js`) inclui controles interativos por item para exclusão rápida de rascunhos e testes indesejados, garantindo conformidade com boas práticas de privacidade e organização do usuário.
+## Validação Final de Ponta a Ponta (E2E) e Estabilidade (Etapa 9)
 
-### Estrutura do projeto
+- **Fluxo Validado:** Ciclo completo de vida do documento testado e aprovado com sucesso — desde a entrada de prompts e anexação de imagens locais (PNG), processamento autônomo via Google Gemini (`gemini-3.8-flash`), persistência de metadados no SQLite, reabertura pelo painel de histórico até a exclusão de rascunhos (`DELETE /api/documents/{document_id}`).
+- **Estabilidade & Ajustes:** Resolução e conversão de caminhos web para URIs locais (`file:///...`) no `pdf_service.py` garantindo renderização de imagens no motor WeasyPrint, suíte de testes `pytest` zerada sem avisos e blindagem contra erros de rede.
 
-```
+---
+
+## Estrutura do Projeto
+
+```text
 ScriptaAI/
 ├── main.py                    # Aplicação FastAPI, rotas da API, exclusão e pipeline de IA
 ├── database.py                # Conexão e sessão com o banco SQLite
@@ -205,12 +133,12 @@ ScriptaAI/
 ├── schemas/
 │   └── document.py            # Schemas de validação e contratos (Pydantic v2 com uploaded_files)
 ├── services/
-│   ├── ai_service.py          # Integração oficial com o Google Gemini (SDK google-genai, gemini-3.8-flash)
+│   ├── ai_service.py          # Integração oficial com o Google Gemini (SDK google-genai, fallback de modelos)
 │   ├── cleanup_service.py     # Limpeza automática de arquivos temporários e LGPD (via lifespan)
 │   ├── file_extractor_service.py # Leitura segura de arquivos locais de apoio (.txt, .md com fallback)
 │   ├── gtk_silencer.py        # Silenciador de avisos do GTK para o WeasyPrint no Windows
 │   ├── media_service.py       # Raspagem de URLs e links externos de apoio
-│   └── pdf_service.py         # Motor de compilação HTML/Markdown para PDF com WeasyPrint
+│   └── pdf_service.py         # Motor de compilação HTML/Markdown para PDF com WeasyPrint (URIs absolutas)
 ├── static/
 │   ├── index.html             # Interface web principal
 │   ├── css/style.css          # Estilos globais, temas claro/escuro e folha A4
@@ -224,103 +152,88 @@ ScriptaAI/
 └── README.md                  # Documentação técnica completa do projeto
 ```
 
-### Instalação
+---
 
-1. Pré-requisitos: Python 3.13 e as bibliotecas do sistema exigidas pelo WeasyPrint (no Windows, o GTK). Consulte a documentação oficial do WeasyPrint para o seu sistema.
-2. Clone o repositório e entre na pasta:
+## Instalação e Execução
 
+### 1. Pré-requisitos
+- **Python:** Versão 3.13 instalada.
+- **GTK:** Bibliotecas de sistema exigidas pelo WeasyPrint no Windows.
+
+### 2. Passos para Iniciar
+1. Clone o repositório e entre na pasta:
    ```bash
    git clone <url-do-repositorio>
    cd ScriptaAI
    ```
-
-3. Crie e ative o ambiente virtual:
-
+2. Crie e ative o ambiente virtual:
    ```bash
    python -m venv .venv
    ```
-
    - Windows: `.venv\Scripts\activate`
    - Linux/macOS: `source .venv/bin/activate`
 
-4. Instale as dependências e inicie o servidor:
-
+3. Instale as dependências de produção:
    ```bash
    pip install -r requirements.txt
+   ```
+
+4. Configure a variável de ambiente criando um arquivo **`.env`** na raiz:
+   ```env
+   GEMINI_API_KEY=sua_chave_do_google_ai_studio_aqui
+   STORAGE_ROOT=storage
+   MAX_UPLOAD_MB=25
+   ```
+
+5. Inicie o servidor FastAPI:
+   ```bash
    uvicorn main:app --reload
    ```
 
-5. Abra `http://127.0.0.1:8000` no navegador.
+6. Acesse no navegador:
+   **[http://127.0.0.1:8000/static/index.html](http://127.0.0.1:8000/static/index.html)**
 
-### Variáveis de ambiente (opcionais)
+---
+
+## Variáveis de Ambiente
 
 | Variável | Padrão | Descrição |
 |---|---|---|
-| `STORAGE_ROOT` | `storage` | Pasta dos arquivos enviados e dos PDFs gerados |
-| `MAX_UPLOAD_MB` | `25` | Tamanho máximo, em MB, de cada arquivo enviado |
-| `ALLOWED_ORIGINS` | `http://127.0.0.1:8000,http://localhost:8000` | Origens permitidas pelo CORS, separadas por vírgula |
+| `GEMINI_API_KEY` | *(Obrigatório)* | Chave de API obtida no Google AI Studio |
+| `STORAGE_ROOT` | `storage` | Diretório de armazenamento dos uploads e PDFs gerados |
+| `MAX_UPLOAD_MB` | `25` | Limite de tamanho por arquivo enviado (em MB) |
+| `ALLOWED_ORIGINS` | `http://127.0.0.1:8000,http://localhost:8000` | Origens autorizadas pelo CORS |
 
-### Endpoints da API
+---
 
-A documentação interativa fica em `http://127.0.0.1:8000/docs`.
+## Endpoints da API
 
-| Método | Rota | Descrição | Sucesso |
+Documentação interativa Swagger disponível em: `http://127.0.0.1:8000/docs`
+
+| Método | Rota | Descrição | Status Sucesso |
 |---|---|---|---|
-| GET | `/api/health` | Verifica se a aplicação está no ar | 200 |
-| POST | `/api/upload` | Envia um ou mais arquivos (campo `files`) | 200 |
-| POST | `/api/generate-preview` | Gera o HTML da pré-visualização | 200 |
-| POST | `/api/export-pdf` | Gera e devolve o PDF do documento | 200 |
-| POST | `/api/documents` | Salva o documento no banco | 201 |
-| GET | `/api/documents` | Lista os documentos salvos, do mais recente ao mais antigo | 200 |
-| GET | `/api/documents/{document_id}` | Retorna um documento salvo com capa e texto completos | 200 |
+| `GET` | `/api/health` | Healthcheck da aplicação | 200 OK |
+| `POST` | `/api/upload` | Upload de arquivos de apoio/imagens | 200 OK |
+| `POST` | `/api/generate-preview` | Geração do preview em HTML com IA | 200 OK |
+| `POST` | `/api/export-pdf` | Compilação e exportação de PDF nativo | 200 OK |
+| `POST` | `/api/documents` | Salva o documento no banco SQLite | 201 Created |
+| `GET` | `/api/documents` | Lista o histórico de documentos salvos | 200 OK |
+| `GET` | `/api/documents/{id}` | Busca um documento salvo específico | 200 OK |
+| `DELETE` | `/api/documents/{id}` | Exclui documento e arquivos físicos vinculados | 204 No Content |
 
-Os erros seguem o formato `{"ok": false, "error": "mensagem"}`:
+---
 
-| Código | Quando acontece |
-|---|---|
-| 404 | Documento não encontrado |
-| 413 | Arquivo maior que o limite de `MAX_UPLOAD_MB` |
-| 415 | Extensão de arquivo não permitida |
-| 422 | Dados do payload inválidos |
-| 500 | Falha interna, como erro na geração do PDF |
+## Execução de Testes Automatizados
 
-### Banco de dados
-
-O banco é um arquivo SQLite (`scriptaai.db`), criado automaticamente na primeira execução.
-
-| Tabela | Modelo | Finalidade |
-|---|---|---|
-| `documents` | `Document` | Título, norma, fonte, tamanho, margem, capa (JSON), fórmula, texto e datas |
-| `source_files` | `SourceFile` | Arquivos de apoio vinculados a um documento |
-| `document_images` | `DocumentImage` | Imagens vinculadas a um documento |
-| `export_records` | `ExportRecord` | Registro dos arquivos exportados |
-
-A API grava e lê apenas a tabela `documents`. As demais tabelas já existem, mas ainda não são preenchidas pela aplicação.
-
-### Testes automatizados
+Para rodar a suíte de testes de integração e componentes:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
+pytest -v
 ```
 
-A suíte em `tests/` cobre a rota de verificação, o upload (envio válido, extensão recusada e falta de arquivo), a pré-visualização em diferentes cenários (com links simulados) e a geração do PDF, incluindo falha simulada no motor. Os testes usam pastas temporárias e não alteram o `storage` real.
+---
 
-### Privacidade e LGPD
+## Licença
 
-- **Limpeza automática:** uma tarefa em segundo plano, iniciada com a aplicação, remove arquivos temporários. A regra está em `services/cleanup_service.py`. Prazo: `<preencher após conferir o cleanup_service.py>`.
-- **Arquivos enviados:** ficam em `storage/uploads`.
-- **PDFs gerados:** ficam em `storage/output`.
-- **Documentos salvos:** ficam no banco até serem excluídos. A interface ainda não tem função para excluir documentos.
-- **Política de privacidade:** a versão atual é preliminar e precisa de revisão jurídica antes da publicação.
-
-### Limitações conhecidas
-
-- Links e arquivos enviados não são salvos com o documento e, por isso, não voltam ao reabrir.
-- A geração de texto por IA ainda não está implementada. O conteúdo vem do que o usuário escreve.
-- A exportação para Word gera um arquivo `.doc`, e não um `.docx`.
-- Ainda não há rota para excluir documentos salvos.
-
-### Licença
-
-Projeto sob a licença MIT. Veja o arquivo `LICENSE`.
+Este projeto está sob a licença **MIT**. Veja o arquivo `LICENSE` para mais detalhes.

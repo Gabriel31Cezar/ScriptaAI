@@ -216,10 +216,22 @@ def _images_html(images: list[dict] | None, layout: str | None, size: int | None
         caption = (img.get("caption") or "").strip()
         if not src:
             continue
+
+        # Converte caminhos web relativos (/static/uploads/...) em URI de arquivo local absoluto
+        # para garantir que o WeasyPrint consiga carregar e renderizar a imagem corretamente no PDF.
+        if src.startswith("/"):
+            local_path = Path.cwd() / src.lstrip("/")
+            if local_path.exists():
+                src = local_path.as_uri()
+        elif not src.startswith("http") and not src.startswith("file:"):
+            local_path = Path(src)
+            if local_path.exists():
+                src = local_path.as_uri()
+
         cap = f"<figcaption>{_esc(caption)}</figcaption>" if caption else ""
         figs.append(
             f'<figure style="width:{width}; margin:0 auto;">'
-            f'<img src="{_esc(src)}" style="width:100%;" />{cap}</figure>'
+            f'<img src="{src}" style="width:100%;" />{cap}</figure>'
         )
     if not figs:
         return ""
@@ -236,7 +248,6 @@ def _esc(text: str) -> str:
     )
 
 def _markdown_to_html(content: str) -> str:
-    # Adicionado nl2br para respeitar as quebras de linha do texto
     return markdown.markdown(
         content,
         extensions=["extra", "tables", "fenced_code", "sane_lists", "nl2br"],
@@ -251,7 +262,6 @@ def build_html(payload: dict) -> str:
 
     content = (payload.get("content") or "").strip()
 
-    # Trava de segurança: se o usuário mandar gerar vazio, colocamos um aviso
     if not content and not payload.get("cover") and not payload.get("images"):
         content = "<p style='color: red;'>Nenhum conteúdo foi gerado. Por favor, digite um texto no prompt.</p>"
 
