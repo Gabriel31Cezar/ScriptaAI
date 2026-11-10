@@ -165,6 +165,18 @@ O ScriptaAI foi expandido para contar com motor de geração de conteúdo inteli
 - Pytest (testes automatizados)
 - HTML5, CSS3 e JavaScript puro
 
+## Processamento de Fontes de Entrada & Upload de Arquivos (Etapa 7)
+
+O ScriptaAI foi expandido para processar arquivos de apoio locais (`.txt`, `.md`), permitindo injetar o conteúdo extraído diretamente como fonte de contexto para o prompt da inteligência artificial antes da geração final do documento.
+
+### Arquitetura de Extração (`services/file_extractor_service.py`)
+- **Leitura Segura:** Implementação de rotina para abertura e extração de texto bruto de arquivos locais.
+- **Tratamento de Codificação:** Suporte nativo à codificação `utf-8` com mecanismo inteligente de fallback para `latin-1`, prevenindo falhas de decodificação de caracteres.
+- **Validação de Extensões:** Restrição controlada para formatos de texto suportados (`.txt` e `.md`).
+
+### Atualização de Contratos (`schemas/document.py`)
+- **Schemas Pydantic v2:** Inclusão do campo `uploaded_files` na classe de entrada `GenerateIn`, permitindo mapear referências aos arquivos enviados pelo usuário para compor o escopo informacional da IA.
+
 ### Estrutura do projeto
 
 ```

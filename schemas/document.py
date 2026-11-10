@@ -20,6 +20,8 @@ class GenerateIn(BaseModel):
     prompt: Optional[str] = Field(None, max_length=5000)
     content: Optional[str] = Field(None, max_length=50000)
     links: List[str] = Field(default_factory=list)
+    # Adicionado para suportar arquivos de apoio locais (.txt, .md)
+    uploaded_files: List[str] = Field(default_factory=list)
     norm: Literal["abnt", "apa-ieee", "executivo", "apostila"] = "abnt"
     font_family: Literal["arial", "times", "roboto", "monospace"] = "arial"
     font_size: Literal[10, 11, 12, 13, 14] = 12
@@ -68,6 +70,8 @@ class DocumentDetailOut(BaseModel):
 class PreviewOut(BaseModel):
     html: str
     used_links: int = 0
+    # Opcional: podemos incluir contagem de arquivos usados se achar prudente, mantendo compatibilidade
+    used_files: int = 0
 
 
 class UploadOut(BaseModel):
