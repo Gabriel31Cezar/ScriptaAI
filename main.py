@@ -1,7 +1,7 @@
 """
 ScriptaAI — Backend FastAPI (Etapa 3 - Banco de Dados & LGPD).
 - Serve a interface em static/ (rota "/" e arquivos css/ e js/)
-- Endpoints: /api/health, /api/upload, /api/generate-preview, /api/export-pdf, /api/documents
+- Endpoints: /api/health, /api/upload, /api/generate-preview, /api/export-pdf, /api/documents, /api/documents/{document_id}
 - Storage com UUID em storage/uploads e storage/output
 - Persistência com SQLAlchemy e SQLite + Tarefa de Auto-limpeza LGPD
 """
@@ -28,7 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from services import media_service, pdf_service
+from services import media_service, pdf_service, file_extractor_service
 from services.ai_service import generate_text_with_gemini
 from services.cleanup_service import cleanup_temporary_files_task
 from database import engine, Base, get_db
@@ -192,9 +192,28 @@ async def generate_preview(payload: GenerateIn) -> PreviewOut:
             print(f"[AVISO] Link falhou ou não retornou texto: {item.get('url')}")
 
     used_links = len(extra_parts)
+
+    # 2. Processa os arquivos de apoio locais (.txt, .md) anexados no upload
+    uploaded_files = data.get("uploaded_files") or []
+    used_files = 0
+    for file_ref in uploaded_files:
+        file_path = UPLOAD_DIR / file_ref
+        if not file_path.exists():
+            # Tenta localização direta por nome se o caminho exato não for informado
+            file_path = UPLOAD_DIR / Path(file_ref).name
+
+        if file_path.exists() and file_path.suffix.lower() in {".txt", ".md"}:
+            try:
+                extracted_text = file_extractor_service.extract_text_from_file(file_path)
+                if extracted_text.strip():
+                    extra_parts.append(f"[CONTEÚDO DO ARQUIVO: {file_path.name}]\n{extracted_text}")
+                    used_files += 1
+            except Exception as e:
+                print(f"[AVISO] Não foi possível ler o arquivo {file_path.name}: {e}")
+
     context_material = "\n\n".join(extra_parts).strip()
 
-    # 2. Isola o Prompt como comando/instrução e os links como material de apoio estrito
+    # 3. Isola o Prompt como comando/instrução e os materiais de apoio estritos (links + arquivos)
     ai_instruction = prompt_text if prompt_text else "Gere um documento estruturado com base nas referências fornecidas."
 
     if context_material:
@@ -213,28 +232,43 @@ async def generate_preview(payload: GenerateIn) -> PreviewOut:
             f"Escreva o texto completo e estruturado para o documento correspondente."
         )
 
-    # 3. Executa a chamada ao Gemini com o prompt separado do conteúdo bruto
+    # 4. Executa a chamada ao Gemini com o prompt separado do conteúdo bruto
     try:
         generated_content = generate_text_with_gemini(full_ai_prompt)
     except Exception as e:
         generated_content = f"[Erro ao gerar texto com IA: {str(e)}]"
 
     data["content"] = generated_content
-    print(f"[INFO] Preview gerado. Links usados como contexto: {used_links}")
+    print(f"[INFO] Preview gerado. Links usados: {used_links} | Arquivos lidos: {used_files}")
 
     html = pdf_service.build_html(data)
-    return PreviewOut(html=html, used_links=used_links)
+    return PreviewOut(html=html, used_links=used_links, used_files=used_files)
 
 
 @app.post("/api/export-pdf")
 async def export_pdf(payload: GenerateIn) -> FileResponse:
     data = payload.model_dump()
 
-    # Aplica a mesma estrutura de isolamento entre comando (prompt) e contexto (links) no PDF
+    # Aplica a mesma estrutura de isolamento entre comando (prompt) e contexto (links + arquivos) no PDF
     prompt_text = (data.get("prompt") or "").strip()
     if prompt_text and not (data.get("content") and data.get("content") != prompt_text):
         scraped = await media_service.scrape_many(data.get("links") or [])
-        context_material = "\n\n".join([item["text"] for item in scraped if item.get("text")]).strip()
+        context_parts = [item["text"] for item in scraped if item.get("text")]
+
+        # Processa arquivos locais no PDF caso necessário
+        for file_ref in data.get("uploaded_files") or []:
+            file_path = UPLOAD_DIR / file_ref
+            if not file_path.exists():
+                file_path = UPLOAD_DIR / Path(file_ref).name
+            if file_path.exists() and file_path.suffix.lower() in {".txt", ".md"}:
+                try:
+                    txt = file_extractor_service.extract_text_from_file(file_path)
+                    if txt.strip():
+                        context_parts.append(txt)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[AVISO] Não foi possível ler o arquivo de apoio: {exc}")
+
+        context_material = "\n\n".join(context_parts).strip()
 
         if context_material:
             full_ai_prompt = (
@@ -344,6 +378,33 @@ def get_document(document_id: str, db: Session = Depends(get_db)):
         created_at=doc.created_at.isoformat(),
         updated_at=doc.updated_at.isoformat() if doc.updated_at else None,
     )
+
+
+@app.delete("/api/documents/{document_id}", status_code=http_status.HTTP_204_NO_CONTENT)
+def delete_document(document_id: str, db: Session = Depends(get_db)):
+    """Exclui um documento salvo do banco de dados e remove arquivos físicos associados."""
+    doc = db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Documento não encontrado.")
+
+    # Remove arquivos físicos de exportação associados (se houverem)
+    for exp in doc.exports:
+        if exp.file_path:
+            p = Path(exp.file_path)
+            if p.exists():
+                p.unlink(missing_ok=True)
+
+    # Remove arquivos de apoio enviados associados (se houverem)
+    for sf in doc.source_files:
+        if sf.stored_as:
+            p = UPLOAD_DIR / sf.stored_as
+            if p.exists():
+                p.unlink(missing_ok=True)
+
+    # Deleta do banco (o cascade remove automaticamente source_files, images e exports do DB)
+    db.delete(doc)
+    db.commit()
+    return None
 
 
 # ---------------------------------------------------------------------------

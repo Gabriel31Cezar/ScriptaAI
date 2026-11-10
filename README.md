@@ -177,30 +177,51 @@ O ScriptaAI foi expandido para processar arquivos de apoio locais (`.txt`, `.md`
 ### Atualização de Contratos (`schemas/document.py`)
 - **Schemas Pydantic v2:** Inclusão do campo `uploaded_files` na classe de entrada `GenerateIn`, permitindo mapear referências aos arquivos enviados pelo usuário para compor o escopo informacional da IA.
 
+## IA Generativa, Segurança & Exclusão de Rascunhos (Etapa 8)
+
+O ScriptaAI foi expandido com um motor de inteligência artificial de alta performance e mecanismos robustos de gerenciamento e segurança de dados, permitindo a limpeza de rascunhos e controle total do ciclo de vida dos documentos salvos.
+
+### Integração com o Google Gemini (`services/ai_service.py`)
+- **SDK Oficial:** Utiliza a biblioteca moderna `google-genai` do Google com o modelo estável **`gemini-3.8-flash`** para geração autônoma de conteúdo contextual.
+- **Isolamento de Contexto:** O pipeline separa estritamente as instruções de comando (prompt) das fontes de referência (links externos e arquivos locais), prevenindo poluição visual no documento final.
+- **Credenciais Seguras:** Chave de acesso gerenciada por variável de ambiente isolada (`GEMINI_API_KEY`) via `.env`.
+
+### Processamento de Fontes de Entrada (`services/file_extractor_service.py`)
+- **Leitura Segura:** Suporte a arquivos locais `.txt` e `.md` codificados em `utf-8` com fallback inteligente para `latin-1`.
+- **Injeção Dinâmica:** O conteúdo extraído dos arquivos de apoio é somado aos links raspados para compor o escopo informacional base da IA antes da renderização no preview A4.
+
+### Gestão Segura e Exclusão de Documentos
+- **Exclusão em Cascata:** O backend conta com endpoint dedicado (`DELETE /api/documents/{document_id}`) que remove o registro relacional do banco de dados e os arquivos físicos associados (exports e uploads temporários) de forma síncrona.
+- **Interface de Limpeza no Histórico:** O painel lateral do frontend (`static/js/app.js`) inclui controles interativos por item para exclusão rápida de rascunhos e testes indesejados, garantindo conformidade com boas práticas de privacidade e organização do usuário.
+
 ### Estrutura do projeto
 
 ```
 ScriptaAI/
-├── main.py                    # Aplicação FastAPI e rotas da API
-├── database.py                # Conexão com o banco SQLite
+├── main.py                    # Aplicação FastAPI, rotas da API, exclusão e pipeline de IA
+├── database.py                # Conexão e sessão com o banco SQLite
 ├── models/
-│   └── document.py            # Modelos do banco
+│   └── document.py            # Modelos relacionais do banco (Document, SourceFile, etc.)
 ├── schemas/
-│   └── document.py            # Schemas de entrada e saída (Pydantic)
+│   └── document.py            # Schemas de validação e contratos (Pydantic v2 com uploaded_files)
 ├── services/
-│   ├── cleanup_service.py     # Limpeza automática de arquivos temporários (LGPD)
-│   ├── gtk_silencer.py        # Silencia avisos do GTK antes do WeasyPrint
-│   ├── media_service.py       # Leitura de links
-│   └── pdf_service.py         # Montagem do HTML e geração do PDF
+│   ├── ai_service.py          # Integração oficial com o Google Gemini (SDK google-genai, gemini-3.8-flash)
+│   ├── cleanup_service.py     # Limpeza automática de arquivos temporários e LGPD (via lifespan)
+│   ├── file_extractor_service.py # Leitura segura de arquivos locais de apoio (.txt, .md com fallback)
+│   ├── gtk_silencer.py        # Silenciador de avisos do GTK para o WeasyPrint no Windows
+│   ├── media_service.py       # Raspagem de URLs e links externos de apoio
+│   └── pdf_service.py         # Motor de compilação HTML/Markdown para PDF com WeasyPrint
 ├── static/
-│   ├── index.html             # Interface
-│   ├── css/style.css          # Estilos e tema claro/escuro
-│   └── js/app.js              # Lógica da interface
-├── mocks/                     # Payloads de exemplo usados nos testes
-├── tests/                     # Testes automatizados
-├── pytest.ini
-├── requirements.txt
-└── requirements-dev.txt
+│   ├── index.html             # Interface web principal
+│   ├── css/style.css          # Estilos globais, temas claro/escuro e folha A4
+│   └── js/app.js              # Comportamento, upload, preview, histórico e botão de exclusão 🗑️
+├── storage/                   # Diretório de armazenamento local (uploads e output de PDFs)
+├── mocks/                     # Payloads de exemplo para os testes automatizados
+├── tests/                     # Testes unitários e de integração com Pytest
+├── pytest.ini                 # Configurações do ambiente de testes
+├── requirements.txt           # Dependências de produção do projeto
+├── requirements-dev.txt       # Dependências de desenvolvimento e testes
+└── README.md                  # Documentação técnica completa do projeto
 ```
 
 ### Instalação

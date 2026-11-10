@@ -3,6 +3,7 @@
    Etapa 1 (interface) + 3.1 (upload) + 3.2 (preview) + 3.3 (exportação)
    + Etapa 5 (carregamento, mensagens amigáveis, teclado, salvar documento,
    lista de documentos salvos, abrir documento salvo)
+   + Exclusão de documentos do histórico
    ========================================================================== */
 
 (() => {
@@ -294,10 +295,8 @@
             void uploadFiles(files);
         });
 
-        // Clique com o mouse abre o seletor
         zone.addEventListener("click", openPicker);
 
-        // Teclado: Enter ou Espaço também abrem o seletor
         zone.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
@@ -328,7 +327,6 @@
         });
     }
 
-    // Impede que o navegador abra um arquivo solto fora da área de upload
     function blockBrowserFileOpen() {
         window.addEventListener("dragover", (event) => event.preventDefault());
         window.addEventListener("drop", (event) => event.preventDefault());
@@ -386,7 +384,6 @@
         sheet.dataset.margin = margin;
     }
 
-    // O tamanho escolhido vale para a imagem e para a fórmula
     function applyImageOptions() {
         const size = fieldValue("#image-size-select") || "60";
         const layout = fieldValue("#image-layout-select") || "below";
@@ -460,10 +457,6 @@
         };
     }
 
-    /**
-     * Converte o HTML recebido do servidor em nós do DOM, removendo
-     * scripts, estilos, iframes, atributos "on..." e links javascript:.
-     */
     function sanitizeToNodes(html) {
         const parsed = new DOMParser().parseFromString(String(html), "text/html");
         const body = parsed.body;
@@ -501,10 +494,6 @@
         sanitizeToNodes(html).forEach((node) => host.appendChild(node));
     }
 
-    /**
-     * Gera o preview. Retorna true em caso de sucesso e false em caso de erro,
-     * para quem chamar decidir qual mensagem mostrar depois.
-     */
     async function generatePreview() {
         const btn = $("#generate-btn");
         const loading = $("#a4-loading");
@@ -562,7 +551,6 @@
 
             const data = await resp.json();
             setStatus(`Documento salvo: "${data.title}".`, "ok");
-            // Atualiza a lista para mostrar o documento recém-salvo
             void loadDocuments();
         } catch (err) {
             setStatus(friendlyNetworkError(err), "error");
@@ -572,12 +560,9 @@
     }
 
     /* ---------------------------------------------------------------------
-       Lista de documentos salvos via GET /api/documents
+       Lista e exclusão de documentos salvos (GET e DELETE /api/documents)
        --------------------------------------------------------------------- */
 
-    /**
-     * Formata a data vinda do servidor. Se não for possível, mostra o texto original.
-     */
     function formatDate(isoText) {
         const date = new Date(isoText);
         if (Number.isNaN(date.getTime())) return isoText || "";
@@ -615,6 +600,11 @@
 
             info.append(title, meta);
 
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "doc-actions";
+            actionsDiv.style.display = "flex";
+            actionsDiv.style.gap = "4px";
+
             const openBtn = document.createElement("button");
             openBtn.type = "button";
             openBtn.className = "tool-btn doc-open";
@@ -624,7 +614,19 @@
                 void openDocument(doc.id, openBtn);
             });
 
-            li.append(info, openBtn);
+            // Botão de exclusão adicionado para limpar rascunhos antigos indesejados
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
+            deleteBtn.className = "tool-btn doc-delete";
+            deleteBtn.textContent = "🗑️";
+            deleteBtn.title = "Excluir documento";
+            deleteBtn.setAttribute("aria-label", `Excluir documento ${doc.title || "sem título"}`);
+            deleteBtn.addEventListener("click", (event) => {
+                void deleteDocument(doc.id, event);
+            });
+
+            actionsDiv.append(openBtn, deleteBtn);
+            li.append(info, actionsDiv);
             list.appendChild(li);
         });
     }
@@ -661,47 +663,28 @@
         }
     }
 
-    /* ---------------------------------------------------------------------
-       Abrir documento salvo via GET /api/documents/{id}
-       --------------------------------------------------------------------- */
+    async function deleteDocument(docId, event) {
+        if (event) event.stopPropagation();
 
-    /**
-     * Preenche o formulário com os dados do documento salvo.
-     * Links e arquivos enviados não são salvos no banco, então não voltam.
-     */
-    function applyDocumentToForm(doc) {
-        setValue("#prompt-input", doc.content || "");
-        setValue("#links-input", "");
-
-        document.querySelectorAll('input[name="norm"]').forEach((radio) => {
-            radio.checked = radio.value === doc.norm;
-        });
-
-        setValue("#font-select", doc.font_family || "arial");
-        setValue("#size-select", String(doc.font_size || 12));
-        setValue("#margin-select", doc.margin_density || "normal");
-
-        const cover = doc.cover || {};
-        setValue("#cover-title", cover.title || "");
-        setValue("#cover-subtitle", cover.subtitle || "");
-        setValue("#cover-author", cover.author || "");
-        setValue("#cover-institution", cover.institution || "");
-
-        // Se houver título de capa no documento carregado, abre a seção de dados da capa para facilidade
-        const coverDetails = $(".cover-details");
-        if (coverDetails && (cover.title || cover.author)) {
-            coverDetails.open = true;
+        if (!window.confirm("Tem certeza de que deseja excluir este documento do histórico?")) {
+            return;
         }
 
-        setValue("#formula-input", doc.formula || "");
+        try {
+            const resp = await fetch(`${API_DOCUMENTS}/${encodeURIComponent(docId)}`, {
+                method: "DELETE"
+            });
 
-        state.uploadedFiles = [];
-        renderFileList();
+            if (!resp.ok && resp.status !== 204) {
+                setStatus(`Não foi possível excluir o documento. ${await readErrorDetail(resp)}`, "error");
+                return;
+            }
 
-        applyTypographyAndMargins();
-        applyImageOptions();
-        applyCoverToSheet();
-        applyFormulaToSheet();
+            setStatus("Documento excluído com sucesso.", "ok");
+            void loadDocuments();
+        } catch (err) {
+            setStatus(friendlyNetworkError(err), "error");
+        }
     }
 
     async function openDocument(docId, btn) {
@@ -737,6 +720,40 @@
         } finally {
             setBusy(btn, false);
         }
+    }
+
+    function applyDocumentToForm(doc) {
+        setValue("#prompt-input", doc.content || "");
+        setValue("#links-input", "");
+
+        document.querySelectorAll('input[name="norm"]').forEach((radio) => {
+            radio.checked = radio.value === doc.norm;
+        });
+
+        setValue("#font-select", doc.font_family || "arial");
+        setValue("#size-select", String(doc.font_size || 12));
+        setValue("#margin-select", doc.margin_density || "normal");
+
+        const cover = doc.cover || {};
+        setValue("#cover-title", cover.title || "");
+        setValue("#cover-subtitle", cover.subtitle || "");
+        setValue("#cover-author", cover.author || "");
+        setValue("#cover-institution", cover.institution || "");
+
+        const coverDetails = $(".cover-details");
+        if (coverDetails && (cover.title || cover.author)) {
+            coverDetails.open = true;
+        }
+
+        setValue("#formula-input", doc.formula || "");
+
+        state.uploadedFiles = [];
+        renderFileList();
+
+        applyTypographyAndMargins();
+        applyImageOptions();
+        applyCoverToSheet();
+        applyFormulaToSheet();
     }
 
     /* ---------------------------------------------------------------------
@@ -782,7 +799,7 @@
     }
 
     /* ---------------------------------------------------------------------
-       Exportação para .doc (Word), montada com a API DOM
+       Exportação para .doc (Word)
        --------------------------------------------------------------------- */
     function buildWordCss(margin) {
         return `
@@ -841,7 +858,6 @@
         if (!sheet) return;
 
         setBusy(btn, true, "Gerando Word...");
-        // Espera um quadro para o rótulo "Gerando Word..." aparecer antes do trabalho pesado
         await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
         try {
@@ -955,7 +971,6 @@
             modal.showModal();
         });
 
-        // Clique direto na caixa do <dialog> (fora do conteúdo interno) fecha o modal
         modal.addEventListener("click", (event) => {
             if (event.target === modal) modal.close();
         });
